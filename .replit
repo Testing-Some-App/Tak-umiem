@@ -25,12 +25,12 @@ args = "main"
 name = "Dice Roller App"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "vnc"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python main.py"
-
-[workflows.workflow.metadata]
-outputType = "vnc"
 
 [[workflows.workflow]]
 name = "main"
