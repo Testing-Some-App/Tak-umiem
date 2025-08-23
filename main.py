@@ -34,6 +34,8 @@ class DiceRollerApp:
         self.dice2_people_result = 0
         self.dice1_gets_exp = False
         self.dice2_gets_exp = False
+        self.dice1_losses = 0
+        self.dice2_losses = 0
         self.history = []  # Lista przechowująca historię rzutów
         
         # Utworzenie interfejsu
@@ -416,9 +418,12 @@ class DiceRollerApp:
         # Obliczanie wyników bitwy
         self.calculate_battle_results(dice1_final, dice2_final)
         
-        # Aktualizacja wyników liczby ludzi
-        self.dice1_people_result_label.config(text=f"Wynik: {self.dice1_people_result} ludzi")
-        self.dice2_people_result_label.config(text=f"Wynik: {self.dice2_people_result} ludzi")
+        # Aktualizacja wyników liczby ludzi ze stratami
+        dice1_text = f"Wynik: {self.dice1_people_result} ludzi\nStraty: {getattr(self, 'dice1_losses', 0)}"
+        dice2_text = f"Wynik: {self.dice2_people_result} ludzi\nStraty: {getattr(self, 'dice2_losses', 0)}"
+        
+        self.dice1_people_result_label.config(text=dice1_text)
+        self.dice2_people_result_label.config(text=dice2_text)
         
         # Aktualizacja ikon doświadczenia
         self.dice1_exp_icon.config(text="⭐ Doświadczenie +" if self.dice1_gets_exp else "")
@@ -459,57 +464,77 @@ class DiceRollerApp:
                 self.dice2_gets_exp = True
         
         # Nowa logika strat - bazuje głównie na wielkości wyniku z losowością
-        if difference > 0:
-            # Strona przegrywająca i wygrywająca
-            if dice1_final < dice2_final:
-                losing_side = 1
-                winning_result = dice2_final
-                losing_result = dice1_final
-            elif dice2_final < dice1_final:
-                losing_side = 2
+        # Obliczanie bazowego procentu strat dla obu stron na podstawie ich wyników
+        def get_base_loss_for_result(result):
+            if result == 1:
+                return random.uniform(0.0, 0.02)  # 0-2%
+            elif result == 2:
+                return random.uniform(0.01, 0.05)  # 1-5%
+            elif result == 3:
+                return random.uniform(0.03, 0.08)  # 3-8%
+            elif result == 4:
+                return random.uniform(0.05, 0.12)  # 5-12%
+            elif result == 5:
+                return random.uniform(0.08, 0.18)  # 8-18%
+            elif result == 6:
+                return random.uniform(0.20, 0.30)  # 20-30%
+            elif result >= 7:
+                return random.uniform(0.25, 0.50)  # 25-50%
+            else:
+                return 0.05
+        
+        # Obliczanie strat dla obu stron
+        dice1_base_loss = get_base_loss_for_result(dice1_final)
+        dice2_base_loss = get_base_loss_for_result(dice2_final)
+        
+        # Inicjalizacja zmiennych strat
+        dice1_loss_percentage = 0.0
+        dice2_loss_percentage = 0.0
+        
+        if difference == 0:
+            # Remis - obie strony ponoszą straty proporcjonalne do swoich wyników
+            # Ale zmniejszone o połowę bo to remis
+            dice1_loss_percentage = dice1_base_loss * 0.5
+            dice2_loss_percentage = dice2_base_loss * 0.5
+        else:
+            # Jedna strona wygrywa
+            if dice1_final > dice2_final:
+                # Strona 1 wygrywa, strona 2 przegrywa
                 winning_result = dice1_final
                 losing_result = dice2_final
-            else:
-                return  # Remis - brak strat
-            
-            # Obliczanie bazowego procentu strat na podstawie wyniku wygrywającej strony
-            if winning_result == 1:
-                # Bardzo minimalne straty lub brak (0-2%)
-                base_loss = random.uniform(0.0, 0.02)
-            elif winning_result == 2:
-                # Małe straty (1-5%)
-                base_loss = random.uniform(0.01, 0.05)
-            elif winning_result == 3:
-                # Średnie straty (3-8%)
-                base_loss = random.uniform(0.03, 0.08)
-            elif winning_result == 4:
-                # Zauważalne straty (5-12%)
-                base_loss = random.uniform(0.05, 0.12)
-            elif winning_result == 5:
-                # Duże straty (8-18%)
-                base_loss = random.uniform(0.08, 0.18)
-            elif winning_result == 6:
-                # Znaczne straty (20-30%)
-                base_loss = random.uniform(0.20, 0.30)
-            elif winning_result >= 7:
-                # Bardzo duże straty (25-50%)
-                base_loss = random.uniform(0.25, 0.50)
-            else:
-                base_loss = 0.05
-            
-            # Modyfikator różnicy - większa różnica = większe straty
-            difference_multiplier = 1.0 + (difference - 1) * 0.1
-            
-            # Końcowy procent strat
-            final_loss_percentage = min(0.95, base_loss * difference_multiplier)
-            
-            # Aplikowanie strat do strony przegrywającej
-            if losing_side == 1 and self.dice1_people_original > 0:
-                losses = int(self.dice1_people_original * final_loss_percentage)
-                self.dice1_people_result = max(0, self.dice1_people_original - losses)
-            elif losing_side == 2 and self.dice2_people_original > 0:
-                losses = int(self.dice2_people_original * final_loss_percentage)
-                self.dice2_people_result = max(0, self.dice2_people_original - losses)
+                
+                # Wygrywająca strona ma minimalne straty
+                dice1_loss_percentage = dice1_base_loss * 0.1
+                # Przegrywająca strona ma pełne straty z bonusem za różnicę
+                difference_multiplier = 1.0 + (difference - 1) * 0.15
+                dice2_loss_percentage = min(0.95, dice2_base_loss * difference_multiplier)
+                
+            elif dice2_final > dice1_final:
+                # Strona 2 wygrywa, strona 1 przegrywa
+                winning_result = dice2_final
+                losing_result = dice1_final
+                
+                # Wygrywająca strona ma minimalne straty
+                dice2_loss_percentage = dice2_base_loss * 0.1
+                # Przegrywająca strona ma pełne straty z bonusem za różnicę
+                difference_multiplier = 1.0 + (difference - 1) * 0.15
+                dice1_loss_percentage = min(0.95, dice1_base_loss * difference_multiplier)
+        
+        # Aplikowanie strat do obu stron
+        dice1_losses = 0
+        dice2_losses = 0
+        
+        if self.dice1_people_original > 0:
+            dice1_losses = int(self.dice1_people_original * dice1_loss_percentage)
+            self.dice1_people_result = max(0, self.dice1_people_original - dice1_losses)
+        
+        if self.dice2_people_original > 0:
+            dice2_losses = int(self.dice2_people_original * dice2_loss_percentage)
+            self.dice2_people_result = max(0, self.dice2_people_original - dice2_losses)
+        
+        # Zapisywanie strat do użycia w wyświetlaniu
+        self.dice1_losses = dice1_losses
+        self.dice2_losses = dice2_losses
     
     def add_to_history(self, dice1_final, dice2_final):
         """Dodaje wynik do historii"""
