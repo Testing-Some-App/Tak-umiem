@@ -14,7 +14,7 @@ class DiceRollerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Rzut dwoma 4-ściennymi kośćmi")
-        self.root.geometry("800x600")
+        self.root.geometry("1200x700")
         self.root.resizable(False, False)
         
         # Centrowanie okna na ekranie
@@ -31,6 +31,9 @@ class DiceRollerApp:
         self.dice2_people_original = 0
         self.dice1_people_result = 0
         self.dice2_people_result = 0
+        self.dice1_gets_exp = False
+        self.dice2_gets_exp = False
+        self.history = []  # Lista przechowująca historię rzutów
         
         # Utworzenie interfejsu
         self.create_widgets()
@@ -48,18 +51,37 @@ class DiceRollerApp:
         """Tworzy wszystkie elementy interfejsu"""
         # Główny frame
         main_frame = ttk.Frame(self.root, padding="20")
-        main_frame.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
+        main_frame.grid(row=0, column=0, columnspan=2, sticky=tk.W+tk.E+tk.N+tk.S)
+        
+        # Frame po lewej stronie (główna gra)
+        game_frame = ttk.Frame(main_frame)
+        game_frame.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S, padx=(0, 10))
+        
+        # Frame po prawej stronie (historia)
+        history_frame = ttk.LabelFrame(main_frame, text="Historia ostatnich 12 rzutów", padding="10")
+        history_frame.grid(row=0, column=1, sticky=tk.W+tk.E+tk.N+tk.S)
+        
+        # Scrollable text widget dla historii
+        from tkinter import scrolledtext
+        self.history_text = scrolledtext.ScrolledText(
+            history_frame, 
+            width=40, 
+            height=35, 
+            font=("Arial", 9),
+            state=tk.DISABLED
+        )
+        self.history_text.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
         
         # Tytuł aplikacji
         title_label = ttk.Label(
-            main_frame, 
+            game_frame, 
             text="Rzut dwoma 4-ściennymi kośćmi", 
             font=("Arial", 16, "bold")
         )
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
         
         # Frame dla wyników kości (horizontal layout)
-        dice_frame = ttk.LabelFrame(main_frame, text="Wyniki", padding="15")
+        dice_frame = ttk.LabelFrame(game_frame, text="Wyniki", padding="15")
         dice_frame.grid(row=1, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 20))
         
         # Pierwsza strona - liczba ludzi i nazwa
@@ -79,14 +101,23 @@ class DiceRollerApp:
         )
         self.dice1_label.grid(row=2, column=0, padx=20, pady=10)
         
-        # Wynik liczby ludzi strona 1
+        # Wynik liczby ludzi i ikona doświadczenia strona 1
+        result1_frame = ttk.Frame(dice_frame)
+        result1_frame.grid(row=3, column=0, padx=20)
         self.dice1_people_result_label = ttk.Label(
-            dice_frame, 
+            result1_frame, 
             text="", 
             font=("Arial", 10),
             foreground="blue"
         )
-        self.dice1_people_result_label.grid(row=3, column=0, padx=20)
+        self.dice1_people_result_label.grid(row=0, column=0)
+        self.dice1_exp_icon = ttk.Label(
+            result1_frame, 
+            text="", 
+            font=("Arial", 12, "bold"),
+            foreground="gold"
+        )
+        self.dice1_exp_icon.grid(row=0, column=1, padx=(5, 0))
         
         # Druga strona - liczba ludzi i nazwa
         people2_frame = ttk.Frame(dice_frame)
@@ -105,14 +136,23 @@ class DiceRollerApp:
         )
         self.dice2_label.grid(row=2, column=2, padx=20, pady=10)
         
-        # Wynik liczby ludzi strona 2
+        # Wynik liczby ludzi i ikona doświadczenia strona 2
+        result2_frame = ttk.Frame(dice_frame)
+        result2_frame.grid(row=3, column=2, padx=20)
         self.dice2_people_result_label = ttk.Label(
-            dice_frame, 
+            result2_frame, 
             text="", 
             font=("Arial", 10),
             foreground="blue"
         )
-        self.dice2_people_result_label.grid(row=3, column=2, padx=20)
+        self.dice2_people_result_label.grid(row=0, column=0)
+        self.dice2_exp_icon = ttk.Label(
+            result2_frame, 
+            text="", 
+            font=("Arial", 12, "bold"),
+            foreground="gold"
+        )
+        self.dice2_exp_icon.grid(row=0, column=1, padx=(5, 0))
         
         # Separator pionowy
         separator = ttk.Separator(dice_frame, orient='vertical')
@@ -120,7 +160,7 @@ class DiceRollerApp:
         
         # Przycisk do generowania wyniku
         self.roll_button = ttk.Button(
-            main_frame,
+            game_frame,
             text="Wynik",
             command=self.roll_dice,
             style="Roll.TButton"
@@ -132,7 +172,7 @@ class DiceRollerApp:
         style.configure("Roll.TButton", font=("Arial", 12, "bold"))
         
         # Frame dla modyfikatorów
-        modifiers_frame = ttk.LabelFrame(main_frame, text="Modyfikatory", padding="10")
+        modifiers_frame = ttk.LabelFrame(game_frame, text="Modyfikatory", padding="10")
         modifiers_frame.grid(row=3, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(10, 0))
         
         # Lewa kolumna - Strona 1
@@ -198,7 +238,7 @@ class DiceRollerApp:
         
         # Informacja o zakresie wartości
         info_label = ttk.Label(
-            main_frame,
+            game_frame,
             text="Każda strona: 1 do (4 + oczka) + modyfikatory",
             font=("Arial", 10),
             foreground="gray"
@@ -206,13 +246,17 @@ class DiceRollerApp:
         info_label.grid(row=4, column=0, columnspan=3, pady=(10, 0))
         
         # Konfiguracja rozciągania kolumn
-        main_frame.columnconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
-        main_frame.columnconfigure(2, weight=1)
+        main_frame.columnconfigure(0, weight=2)  # Gra
+        main_frame.columnconfigure(1, weight=1)  # Historia
+        game_frame.columnconfigure(0, weight=1)
+        game_frame.columnconfigure(1, weight=1)
+        game_frame.columnconfigure(2, weight=1)
         dice_frame.columnconfigure(0, weight=1)
         dice_frame.columnconfigure(2, weight=1)
         modifiers_frame.columnconfigure(0, weight=1)
         modifiers_frame.columnconfigure(1, weight=1)
+        history_frame.columnconfigure(0, weight=1)
+        history_frame.rowconfigure(0, weight=1)
         
         # Focus na przycisk
         self.roll_button.focus()
@@ -295,12 +339,19 @@ class DiceRollerApp:
         self.dice1_label.config(text=str(dice1_final), foreground=self.get_color_for_value(dice1_final))
         self.dice2_label.config(text=str(dice2_final), foreground=self.get_color_for_value(dice2_final))
         
-        # Aktualizacja wyników liczby ludzi (na razie ta sama co oryginalna)
-        self.dice1_people_result = self.dice1_people_original
-        self.dice2_people_result = self.dice2_people_original
+        # Obliczanie wyników bitwy
+        self.calculate_battle_results(dice1_final, dice2_final)
         
+        # Aktualizacja wyników liczby ludzi
         self.dice1_people_result_label.config(text=f"Wynik: {self.dice1_people_result} ludzi")
         self.dice2_people_result_label.config(text=f"Wynik: {self.dice2_people_result} ludzi")
+        
+        # Aktualizacja ikon doświadczenia
+        self.dice1_exp_icon.config(text="⭐ Doświadczenie +" if self.dice1_gets_exp else "")
+        self.dice2_exp_icon.config(text="⭐ Doświadczenie +" if self.dice2_gets_exp else "")
+        
+        # Dodanie do historii
+        self.add_to_history(dice1_final, dice2_final)
         
         # Efekt wizualny - krótka animacja przycisku
         self.roll_button.config(state="disabled")
@@ -308,6 +359,110 @@ class DiceRollerApp:
         
         # Komunikat o wyniku w zależności od rzutu
         self.display_result_message()
+    
+    def calculate_battle_results(self, dice1_final, dice2_final):
+        """Oblicza wyniki bitwy na podstawie rzutów kośćmi"""
+        # Resetowanie flag doświadczenia
+        self.dice1_gets_exp = False
+        self.dice2_gets_exp = False
+        
+        # Obliczanie różnicy
+        difference = abs(dice1_final - dice2_final)
+        
+        # Inicjalne wartości - brak strat
+        self.dice1_people_result = self.dice1_people_original
+        self.dice2_people_result = self.dice2_people_original
+        
+        # Jeśli brak ludzi, nie ma co obliczać
+        if self.dice1_people_original == 0 and self.dice2_people_original == 0:
+            return
+        
+        # Przy różnicy +2, wyższa strona dostaje ikonkę "Doświadczenie +"
+        if difference >= 2:
+            if dice1_final > dice2_final:
+                self.dice1_gets_exp = True
+            elif dice2_final > dice1_final:
+                self.dice2_gets_exp = True
+        
+        # Obliczanie strat w zależności od różnicy i wysokości wyników
+        if difference > 0:
+            # Maksymalna podstawa strat bazuje na wysokości wyników
+            higher_result = max(dice1_final, dice2_final)
+            lower_result = min(dice1_final, dice2_final)
+            
+            # Procent strat bazuje na różnicy i wysokości wyników
+            if difference >= 10:
+                # Przy różnicy +10 lub więcej: do 90% strat
+                loss_percentage = min(0.9, (difference / 15.0) * 0.9)
+            elif difference >= 5:
+                # Przy różnicy 5-9: straty 20-60%
+                loss_percentage = 0.2 + ((difference - 5) / 4.0) * 0.4
+            elif difference >= 3:
+                # Przy różnicy 3-4: straty 5-15%
+                loss_percentage = 0.05 + ((difference - 3) / 1.0) * 0.1
+            elif difference >= 2:
+                # Przy różnicy 2: straty 1-5%
+                loss_percentage = 0.01 + ((difference - 2) / 1.0) * 0.04
+            else:
+                # Przy różnicy 1: bardzo małe straty (1%)
+                loss_percentage = 0.01
+            
+            # Modyfikacja strat na podstawie wysokości wyników
+            if higher_result <= 3:
+                # Niskie wyniki - zmniejszenie strat
+                loss_percentage *= 0.3
+            elif higher_result >= 8:
+                # Wysokie wyniki - zwiększenie strat
+                loss_percentage *= 1.5
+            
+            # Aplikowanie strat do strony przegrywającej
+            if dice1_final < dice2_final and self.dice1_people_original > 0:
+                losses = max(1, int(self.dice1_people_original * loss_percentage))
+                self.dice1_people_result = max(0, self.dice1_people_original - losses)
+            elif dice2_final < dice1_final and self.dice2_people_original > 0:
+                losses = max(1, int(self.dice2_people_original * loss_percentage))
+                self.dice2_people_result = max(0, self.dice2_people_original - losses)
+    
+    def add_to_history(self, dice1_final, dice2_final):
+        """Dodaje wynik do historii"""
+        # Format: "Strona 1: X | Strona 2: Y | Ludzie: A->B | C->D"
+        history_entry = {
+            'dice1': dice1_final,
+            'dice2': dice2_final,
+            'people1_before': self.dice1_people_original,
+            'people1_after': self.dice1_people_result,
+            'people2_before': self.dice2_people_original,
+            'people2_after': self.dice2_people_result,
+            'exp1': self.dice1_gets_exp,
+            'exp2': self.dice2_gets_exp
+        }
+        
+        # Dodanie do listy historii
+        self.history.append(history_entry)
+        
+        # Zachowanie tylko ostatnich 12 wyników
+        if len(self.history) > 12:
+            self.history.pop(0)
+        
+        # Aktualizacja wyświetlania historii
+        self.update_history_display()
+    
+    def update_history_display(self):
+        """Aktualizuje wyświetlanie historii"""
+        self.history_text.config(state=tk.NORMAL)
+        self.history_text.delete(1.0, tk.END)
+        
+        for i, entry in enumerate(reversed(self.history), 1):
+            exp1_icon = " ⭐" if entry['exp1'] else ""
+            exp2_icon = " ⭐" if entry['exp2'] else ""
+            
+            history_line = f"#{i}: Strona 1: {entry['dice1']}{exp1_icon} | Strona 2: {entry['dice2']}{exp2_icon}\n"
+            history_line += f"    Ludzie: {entry['people1_before']}→{entry['people1_after']} | {entry['people2_before']}→{entry['people2_after']}\n\n"
+            
+            self.history_text.insert(tk.END, history_line)
+        
+        self.history_text.config(state=tk.DISABLED)
+        self.history_text.see(tk.END)  # Przewiń na dół
     
     def get_color_for_value(self, value):
         """Zwraca kolor dla wartości kości (spektrum czerwony-zielony-niebieski)"""
