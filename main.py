@@ -522,11 +522,11 @@ class DiceRollerApp:
             
             # Fortyfikacje przeciwnika zwiększają nasze straty
             if enemy_fortifications == 1:
-                attack_modifier += 0.05  # +5%
+                attack_modifier += random.uniform(0.10, 0.15)  # +10-15%
             elif enemy_fortifications == 2:
-                attack_modifier += 0.10  # +10%
+                attack_modifier += random.uniform(0.16, 0.25)  # +16-25%
             elif enemy_fortifications == 3:
-                attack_modifier += 0.15  # +15%
+                attack_modifier += random.uniform(0.30, 0.40)  # +30-40%
             
             # Końcowy procent strat (nie może być ujemny)
             final_loss_percentage = max(0.0, base_loss_percentage * defense_modifier * attack_modifier)
