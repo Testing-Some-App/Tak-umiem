@@ -14,7 +14,7 @@ class DiceRollerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Rzut dwoma 4-ściennymi kośćmi")
-        self.root.geometry("400x300")
+        self.root.geometry("600x400")
         self.root.resizable(False, False)
         
         # Centrowanie okna na ekranie
