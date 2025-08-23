@@ -493,32 +493,43 @@ class DiceRollerApp:
             else:
                 return 0.05
         
-        def calculate_losses_for_side(enemy_result, own_people, fortifications, no_supply, defense_buildings):
+        def calculate_losses_for_side(enemy_result, own_people, own_fortifications, own_no_supply, own_defense_buildings, enemy_fortifications):
             """Oblicza straty dla jednej strony"""
             # Bazowy procent strat na podstawie wyniku przeciwnika
             base_loss_percentage = get_base_loss_percentage_for_result(enemy_result)
             
-            # Modyfikatory własne
-            loss_modifier = 1.0  # Bazowy mnożnik
+            # Modyfikatory własne (obrona)
+            defense_modifier = 1.0  # Bazowy mnożnik
             
-            # Fortyfikacje zmniejszają straty własne
-            if fortifications == 1:
-                loss_modifier -= 0.05  # -5%
-            elif fortifications == 2:
-                loss_modifier -= 0.10  # -10%
-            elif fortifications == 3:
-                loss_modifier -= 0.15  # -15%
+            # Fortyfikacje własne zmniejszają straty własne
+            if own_fortifications == 1:
+                defense_modifier -= 0.05  # -5%
+            elif own_fortifications == 2:
+                defense_modifier -= 0.10  # -10%
+            elif own_fortifications == 3:
+                defense_modifier -= 0.15  # -15%
             
             # Brak zaopatrzenia zwiększa straty własne
-            if no_supply:
-                loss_modifier += 0.05  # +5%
+            if own_no_supply:
+                defense_modifier += 0.05  # +5%
             
             # Obrona w zabudowaniach zmniejsza straty własne
-            if defense_buildings:
-                loss_modifier -= 0.05  # -5%
+            if own_defense_buildings:
+                defense_modifier -= 0.05  # -5%
+            
+            # Modyfikatory ataku przeciwnika (fortyfikacje przeciwnika zwiększają nasze straty)
+            attack_modifier = 1.0  # Bazowy mnożnik
+            
+            # Fortyfikacje przeciwnika zwiększają nasze straty
+            if enemy_fortifications == 1:
+                attack_modifier += 0.05  # +5%
+            elif enemy_fortifications == 2:
+                attack_modifier += 0.10  # +10%
+            elif enemy_fortifications == 3:
+                attack_modifier += 0.15  # +15%
             
             # Końcowy procent strat (nie może być ujemny)
-            final_loss_percentage = max(0.0, base_loss_percentage * loss_modifier)
+            final_loss_percentage = max(0.0, base_loss_percentage * defense_modifier * attack_modifier)
             
             # WAŻNE: Obliczenia na bazie 150 ludzi, nie rzeczywistej liczby
             absolute_losses = int(150 * final_loss_percentage)
@@ -543,11 +554,11 @@ class DiceRollerApp:
         
         # Obliczanie strat dla obu stron
         self.dice1_people_result, self.dice1_losses = calculate_losses_for_side(
-            dice2_final, self.dice1_people_original, dice1_fort, dice1_no_supply, dice1_defense
+            dice2_final, self.dice1_people_original, dice1_fort, dice1_no_supply, dice1_defense, dice2_fort
         )
         
         self.dice2_people_result, self.dice2_losses = calculate_losses_for_side(
-            dice1_final, self.dice2_people_original, dice2_fort, dice2_no_supply, dice2_defense
+            dice1_final, self.dice2_people_original, dice2_fort, dice2_no_supply, dice2_defense, dice1_fort
         )
     
     def add_to_history(self, dice1_final, dice2_final):
