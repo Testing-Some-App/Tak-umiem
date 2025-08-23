@@ -145,7 +145,7 @@ class DiceRollerApp:
             result1_frame, 
             text="", 
             font=("Arial", 12, "bold"),
-            foreground="gold"
+            foreground="#B8860B"
         )
         self.dice1_exp_icon.grid(row=0, column=1, padx=(5, 0))
         
@@ -180,7 +180,7 @@ class DiceRollerApp:
             result2_frame, 
             text="", 
             font=("Arial", 12, "bold"),
-            foreground="gold"
+            foreground="#B8860B"
         )
         self.dice2_exp_icon.grid(row=0, column=1, padx=(5, 0))
         
