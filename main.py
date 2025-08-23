@@ -7,6 +7,7 @@ Simple Polish tkinter application for rolling two 4-sided dice
 
 import tkinter as tk
 from tkinter import ttk
+from tkinter import scrolledtext
 import random
 
 
@@ -49,8 +50,31 @@ class DiceRollerApp:
     
     def create_widgets(self):
         """Tworzy wszystkie elementy interfejsu"""
+        # Tworzenie canvas i scrollbar dla przewijania
+        canvas = tk.Canvas(self.root)
+        scrollbar_v = ttk.Scrollbar(self.root, orient="vertical", command=canvas.yview)
+        scrollbar_h = ttk.Scrollbar(self.root, orient="horizontal", command=canvas.xview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar_v.set, xscrollcommand=scrollbar_h.set)
+        
+        # Grid layout dla canvas i scrollbars
+        canvas.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
+        scrollbar_v.grid(row=0, column=1, sticky=tk.N+tk.S)
+        scrollbar_h.grid(row=1, column=0, sticky=tk.W+tk.E)
+        
+        # Konfiguracja rozciągania root
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        
         # Główny frame
-        main_frame = ttk.Frame(self.root, padding="20")
+        main_frame = ttk.Frame(scrollable_frame, padding="20")
         main_frame.grid(row=0, column=0, columnspan=2, sticky=tk.W+tk.E+tk.N+tk.S)
         
         # Frame po lewej stronie (główna gra)
@@ -62,7 +86,6 @@ class DiceRollerApp:
         history_frame.grid(row=0, column=1, sticky=tk.W+tk.E+tk.N+tk.S)
         
         # Scrollable text widget dla historii
-        from tkinter import scrolledtext
         self.history_text = scrolledtext.ScrolledText(
             history_frame, 
             width=40, 
@@ -71,6 +94,11 @@ class DiceRollerApp:
             state=tk.DISABLED
         )
         self.history_text.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
+        
+        # Bind scroll wheel to canvas
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind("<MouseWheel>", _on_mousewheel)
         
         # Tytuł aplikacji
         title_label = ttk.Label(
@@ -196,15 +224,30 @@ class DiceRollerApp:
         self.dice1_surrounded_check = ttk.Checkbutton(left_frame, text="Otoczony (-1)", variable=self.dice1_surrounded_var, onvalue=True, offvalue=False)
         self.dice1_surrounded_check.grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
         
-        # Doświadczenie strona 1
-        ttk.Label(left_frame, text="Doświadczenie:", font=("Arial", 10, "bold")).grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        # Doświadczenie strona 1 (tylko jeden może być wybrany)
+        ttk.Label(left_frame, text="Doświadczenie:", font=("Arial", 10, "bold")).grid(row=3, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
         
-        self.dice1_exp_vars = {}
+        self.dice1_exp_var = tk.IntVar(value=0)
         exp_values = [-2, -1, 0, 1, 2, 3, 4, 5, 6]
         for i, exp_val in enumerate(exp_values):
-            self.dice1_exp_vars[exp_val] = tk.BooleanVar()
-            exp_check = ttk.Checkbutton(left_frame, text=f"Doświadczenie {exp_val:+d}", variable=self.dice1_exp_vars[exp_val])
-            exp_check.grid(row=4 + i//3, column=i%3, sticky=tk.W, pady=(2, 0), padx=(0, 5))
+            exp_radio = ttk.Radiobutton(left_frame, text=f"Doświadczenie {exp_val:+d}", variable=self.dice1_exp_var, value=exp_val)
+            exp_radio.grid(row=4 + i//3, column=i%3, sticky=tk.W, pady=(2, 0), padx=(0, 5))
+        
+        # Dodatkowe modyfikatory strona 1
+        ttk.Label(left_frame, text="Dodatkowe:", font=("Arial", 10, "bold")).grid(row=7, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
+        
+        self.dice1_defense_var = tk.BooleanVar()
+        self.dice1_defense_check = ttk.Checkbutton(left_frame, text="Obrona w zabudowaniach (+1)", variable=self.dice1_defense_var)
+        self.dice1_defense_check.grid(row=8, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
+        
+        self.dice1_supply_var = tk.BooleanVar()
+        self.dice1_supply_check = ttk.Checkbutton(left_frame, text="Brak zaopatrzenia (-1)", variable=self.dice1_supply_var)
+        self.dice1_supply_check.grid(row=9, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
+        
+        ttk.Label(left_frame, text="Fortyfikacje:", font=("Arial", 10)).grid(row=10, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.dice1_fort_var = tk.IntVar(value=0)
+        fort_combo1 = ttk.Combobox(left_frame, textvariable=self.dice1_fort_var, values=["0", "1", "2", "3"], width=3, state="readonly")
+        fort_combo1.grid(row=10, column=1, padx=(0, 5), pady=(5, 0))
         
         # Prawa kolumna - Strona 2
         right_frame = ttk.LabelFrame(modifiers_frame, text="Strona 2", padding="10")
@@ -227,14 +270,29 @@ class DiceRollerApp:
         self.dice2_surrounded_check = ttk.Checkbutton(right_frame, text="Otoczony (-1)", variable=self.dice2_surrounded_var, onvalue=True, offvalue=False)
         self.dice2_surrounded_check.grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
         
-        # Doświadczenie strona 2
-        ttk.Label(right_frame, text="Doświadczenie:", font=("Arial", 10, "bold")).grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=(10, 5))
+        # Doświadczenie strona 2 (tylko jeden może być wybrany)
+        ttk.Label(right_frame, text="Doświadczenie:", font=("Arial", 10, "bold")).grid(row=3, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
         
-        self.dice2_exp_vars = {}
+        self.dice2_exp_var = tk.IntVar(value=0)
         for i, exp_val in enumerate(exp_values):
-            self.dice2_exp_vars[exp_val] = tk.BooleanVar()
-            exp_check = ttk.Checkbutton(right_frame, text=f"Doświadczenie {exp_val:+d}", variable=self.dice2_exp_vars[exp_val])
-            exp_check.grid(row=4 + i//3, column=i%3, sticky=tk.W, pady=(2, 0), padx=(0, 5))
+            exp_radio = ttk.Radiobutton(right_frame, text=f"Doświadczenie {exp_val:+d}", variable=self.dice2_exp_var, value=exp_val)
+            exp_radio.grid(row=4 + i//3, column=i%3, sticky=tk.W, pady=(2, 0), padx=(0, 5))
+        
+        # Dodatkowe modyfikatory strona 2
+        ttk.Label(right_frame, text="Dodatkowe:", font=("Arial", 10, "bold")).grid(row=7, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
+        
+        self.dice2_defense_var = tk.BooleanVar()
+        self.dice2_defense_check = ttk.Checkbutton(right_frame, text="Obrona w zabudowaniach (+1)", variable=self.dice2_defense_var)
+        self.dice2_defense_check.grid(row=8, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
+        
+        self.dice2_supply_var = tk.BooleanVar()
+        self.dice2_supply_check = ttk.Checkbutton(right_frame, text="Brak zaopatrzenia (-1)", variable=self.dice2_supply_var)
+        self.dice2_supply_check.grid(row=9, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
+        
+        ttk.Label(right_frame, text="Fortyfikacje:", font=("Arial", 10)).grid(row=10, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.dice2_fort_var = tk.IntVar(value=0)
+        fort_combo2 = ttk.Combobox(right_frame, textvariable=self.dice2_fort_var, values=["0", "1", "2", "3"], width=3, state="readonly")
+        fort_combo2.grid(row=10, column=1, padx=(0, 5), pady=(5, 0))
         
         # Informacja o zakresie wartości
         info_label = ttk.Label(
@@ -322,14 +380,30 @@ class DiceRollerApp:
         if self.dice2_surrounded_var.get():
             dice2_total_modifier -= 1
         
-        # Dodawanie modyfikatorów doświadczenia
-        for exp_val, var in self.dice1_exp_vars.items():
-            if var.get():
-                dice1_total_modifier += exp_val
+        # Dodawanie modyfikatorów doświadczenia (tylko jeden może być wybrany)
+        dice1_total_modifier += self.dice1_exp_var.get()
+        dice2_total_modifier += self.dice2_exp_var.get()
         
-        for exp_val, var in self.dice2_exp_vars.items():
-            if var.get():
-                dice2_total_modifier += exp_val
+        # Dodawanie innych modyfikatorów
+        if self.dice1_defense_var.get():
+            dice1_total_modifier += 1
+        if self.dice2_defense_var.get():
+            dice2_total_modifier += 1
+            
+        if self.dice1_supply_var.get():
+            dice1_total_modifier -= 1
+        if self.dice2_supply_var.get():
+            dice2_total_modifier -= 1
+            
+        # Fortyfikacje
+        try:
+            dice1_total_modifier += int(self.dice1_fort_var.get())
+        except ValueError:
+            pass
+        try:
+            dice2_total_modifier += int(self.dice2_fort_var.get())
+        except ValueError:
+            pass
         
         # Obliczanie wartości końcowych
         dice1_final = self.dice1_value + dice1_total_modifier
@@ -384,43 +458,57 @@ class DiceRollerApp:
             elif dice2_final > dice1_final:
                 self.dice2_gets_exp = True
         
-        # Obliczanie strat w zależności od różnicy i wysokości wyników
+        # Nowa logika strat - bazuje głównie na wielkości wyniku z losowością
         if difference > 0:
-            # Maksymalna podstawa strat bazuje na wysokości wyników
-            higher_result = max(dice1_final, dice2_final)
-            lower_result = min(dice1_final, dice2_final)
-            
-            # Procent strat bazuje na różnicy i wysokości wyników
-            if difference >= 10:
-                # Przy różnicy +10 lub więcej: do 90% strat
-                loss_percentage = min(0.9, (difference / 15.0) * 0.9)
-            elif difference >= 5:
-                # Przy różnicy 5-9: straty 20-60%
-                loss_percentage = 0.2 + ((difference - 5) / 4.0) * 0.4
-            elif difference >= 3:
-                # Przy różnicy 3-4: straty 5-15%
-                loss_percentage = 0.05 + ((difference - 3) / 1.0) * 0.1
-            elif difference >= 2:
-                # Przy różnicy 2: straty 1-5%
-                loss_percentage = 0.01 + ((difference - 2) / 1.0) * 0.04
+            # Strona przegrywająca i wygrywająca
+            if dice1_final < dice2_final:
+                losing_side = 1
+                winning_result = dice2_final
+                losing_result = dice1_final
+            elif dice2_final < dice1_final:
+                losing_side = 2
+                winning_result = dice1_final
+                losing_result = dice2_final
             else:
-                # Przy różnicy 1: bardzo małe straty (1%)
-                loss_percentage = 0.01
+                return  # Remis - brak strat
             
-            # Modyfikacja strat na podstawie wysokości wyników
-            if higher_result <= 3:
-                # Niskie wyniki - zmniejszenie strat
-                loss_percentage *= 0.3
-            elif higher_result >= 8:
-                # Wysokie wyniki - zwiększenie strat
-                loss_percentage *= 1.5
+            # Obliczanie bazowego procentu strat na podstawie wyniku wygrywającej strony
+            if winning_result == 1:
+                # Bardzo minimalne straty lub brak (0-2%)
+                base_loss = random.uniform(0.0, 0.02)
+            elif winning_result == 2:
+                # Małe straty (1-5%)
+                base_loss = random.uniform(0.01, 0.05)
+            elif winning_result == 3:
+                # Średnie straty (3-8%)
+                base_loss = random.uniform(0.03, 0.08)
+            elif winning_result == 4:
+                # Zauważalne straty (5-12%)
+                base_loss = random.uniform(0.05, 0.12)
+            elif winning_result == 5:
+                # Duże straty (8-18%)
+                base_loss = random.uniform(0.08, 0.18)
+            elif winning_result == 6:
+                # Znaczne straty (20-30%)
+                base_loss = random.uniform(0.20, 0.30)
+            elif winning_result >= 7:
+                # Bardzo duże straty (25-50%)
+                base_loss = random.uniform(0.25, 0.50)
+            else:
+                base_loss = 0.05
+            
+            # Modyfikator różnicy - większa różnica = większe straty
+            difference_multiplier = 1.0 + (difference - 1) * 0.1
+            
+            # Końcowy procent strat
+            final_loss_percentage = min(0.95, base_loss * difference_multiplier)
             
             # Aplikowanie strat do strony przegrywającej
-            if dice1_final < dice2_final and self.dice1_people_original > 0:
-                losses = max(1, int(self.dice1_people_original * loss_percentage))
+            if losing_side == 1 and self.dice1_people_original > 0:
+                losses = int(self.dice1_people_original * final_loss_percentage)
                 self.dice1_people_result = max(0, self.dice1_people_original - losses)
-            elif dice2_final < dice1_final and self.dice2_people_original > 0:
-                losses = max(1, int(self.dice2_people_original * loss_percentage))
+            elif losing_side == 2 and self.dice2_people_original > 0:
+                losses = int(self.dice2_people_original * final_loss_percentage)
                 self.dice2_people_result = max(0, self.dice2_people_original - losses)
     
     def add_to_history(self, dice1_final, dice2_final):
