@@ -406,9 +406,7 @@ class DiceRollerApp:
         if self.side1_motion_var.get():
             self.side1_attack_var.set(False)
             self.side1_defense_var.set(False)
-            self.side2_attack_var.set(False)
-            self.side2_defense_var.set(False)
-            self.side2_motion_var.set(False)
+            # Nie wyłączamy W ruchu dla strony 2 - może być niezależnie
     
     def on_side2_attack_change(self):
         """Obsługuje zmianę ataku strony 2"""
@@ -433,9 +431,7 @@ class DiceRollerApp:
         if self.side2_motion_var.get():
             self.side2_attack_var.set(False)
             self.side2_defense_var.set(False)
-            self.side1_attack_var.set(False)
-            self.side1_defense_var.set(False)
-            self.side1_motion_var.set(False)
+            # Nie wyłączamy W ruchu dla strony 1 - może być niezależnie
     
     def roll_dice(self):
         """Rzuca dwiema 4-ściennymi kośćmi i aktualizuje wyniki"""
