@@ -695,7 +695,7 @@ class DiceRollerApp:
             else:
                 return 0.05
         
-        def calculate_losses_for_side(enemy_result, own_people, own_fortifications, own_no_supply, own_defense_buildings, enemy_fortifications, own_experience):
+        def calculate_losses_for_side(enemy_result, own_people, own_fortifications, own_no_supply, own_defense_buildings, enemy_fortifications, enemy_defense_buildings, own_experience):
             """Oblicza straty dla jednej strony"""
             # Bazowy procent strat na podstawie wyniku przeciwnika
             base_loss_percentage = get_base_loss_percentage_for_result(enemy_result)
@@ -715,9 +715,8 @@ class DiceRollerApp:
             if own_no_supply:
                 defense_modifier += 0.05  # +5%
             
-            # Obrona w zabudowaniach zmniejsza straty własne
-            if own_defense_buildings:
-                defense_modifier -= 0.05  # -5%
+            # Obrona w zabudowaniach już nie wpływa na własne straty
+            # (przeniesione do modyfikatorów ataku przeciwnika)
             
             # Negatywne doświadczenie zwiększa straty własne
             if own_experience == -1:
@@ -735,6 +734,10 @@ class DiceRollerApp:
                 attack_modifier += random.uniform(0.16, 0.25)  # +16-25%
             elif enemy_fortifications == 3:
                 attack_modifier += random.uniform(0.30, 0.40)  # +30-40%
+            
+            # Obrona w zabudowaniach przeciwnika zwiększa nasze straty
+            if enemy_defense_buildings:
+                attack_modifier += random.uniform(0.05, 0.15)  # +5-15%
             
             # Końcowy procent strat (nie może być ujemny)
             final_loss_percentage = max(0.0, base_loss_percentage * defense_modifier * attack_modifier)
@@ -765,11 +768,11 @@ class DiceRollerApp:
         dice2_experience = self.dice2_exp_var.get()
         
         self.dice1_people_result, self.dice1_losses = calculate_losses_for_side(
-            dice2_final, self.dice1_people_original, dice1_fort, dice1_no_supply, dice1_defense, dice2_fort, dice1_experience
+            dice2_final, self.dice1_people_original, dice1_fort, dice1_no_supply, dice1_defense, dice2_fort, dice2_defense, dice1_experience
         )
         
         self.dice2_people_result, self.dice2_losses = calculate_losses_for_side(
-            dice1_final, self.dice2_people_original, dice2_fort, dice2_no_supply, dice2_defense, dice1_fort, dice2_experience
+            dice1_final, self.dice2_people_original, dice2_fort, dice2_no_supply, dice2_defense, dice1_fort, dice1_defense, dice2_experience
         )
     
     def add_to_history(self, dice1_final, dice2_final):
