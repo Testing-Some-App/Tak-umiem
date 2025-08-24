@@ -892,8 +892,9 @@ class DiceRollerApp:
             # Końcowy procent strat (nie może być ujemny)
             final_loss_percentage = max(0.0, base_loss_percentage * defense_modifier * attack_modifier)
             
-            # WAŻNE: Obliczenia na bazie 150 ludzi, nie rzeczywistej liczby
-            absolute_losses = int(150 * final_loss_percentage)
+            # Obliczenia strat: dla ≤150 ludzi - baza 150, dla >150 ludzi - baza rzeczywista
+            loss_base = 150 if own_people <= 150 else own_people
+            absolute_losses = int(loss_base * final_loss_percentage)
             
             # Aplikowanie strat - nie może być mniej niż 0
             if own_people > 0:
