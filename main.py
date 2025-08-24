@@ -256,20 +256,30 @@ class DiceRollerApp:
         )
         self.roll_button.grid(row=4, column=0, columnspan=3, pady=(5, 20))
         
-        # Stylizacja przycisku
+        # Stylizacja przycisków
         style = ttk.Style()
         style.configure("Roll.TButton", font=("Arial", 12, "bold"))
+        style.configure("Reset.TButton", font=("Arial", 10))
         
         # Frame dla modyfikatorów
         modifiers_frame = ttk.LabelFrame(game_frame, text="Modyfikatory", padding="10")
         modifiers_frame.grid(row=5, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(10, 0))
         
+        # Przycisk Reset na górze modyfikatorów
+        reset_button = ttk.Button(
+            modifiers_frame,
+            text="Reset",
+            command=self.reset_modifiers,
+            style="Reset.TButton"
+        )
+        reset_button.grid(row=0, column=0, columnspan=2, pady=(0, 10))
+        
         # Lewa kolumna - Strona 1
         left_frame = ttk.LabelFrame(modifiers_frame, text="Strona 1", padding="10")
-        left_frame.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S, padx=(0, 10))
+        left_frame.grid(row=1, column=0, sticky=tk.W+tk.E+tk.N+tk.S, padx=(0, 10))
         
         # Modyfikator do wyniku strony 1
-        ttk.Label(left_frame, text="Modyfikator:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(left_frame, text="Dodatek:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
         self.dice1_modifier_var = tk.StringVar(value="0")
         self.dice1_modifier_entry = ttk.Entry(left_frame, textvariable=self.dice1_modifier_var, width=5, font=("Arial", 10))
         self.dice1_modifier_entry.grid(row=0, column=1, padx=(0, 5))
@@ -312,10 +322,10 @@ class DiceRollerApp:
         
         # Prawa kolumna - Strona 2
         right_frame = ttk.LabelFrame(modifiers_frame, text="Strona 2", padding="10")
-        right_frame.grid(row=0, column=1, sticky=tk.W+tk.E+tk.N+tk.S, padx=(10, 0))
+        right_frame.grid(row=1, column=1, sticky=tk.W+tk.E+tk.N+tk.S, padx=(10, 0))
         
         # Modyfikator do wyniku strony 2
-        ttk.Label(right_frame, text="Modyfikator:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(right_frame, text="Dodatek:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
         self.dice2_modifier_var = tk.StringVar(value="0")
         self.dice2_modifier_entry = ttk.Entry(right_frame, textvariable=self.dice2_modifier_var, width=5, font=("Arial", 10))
         self.dice2_modifier_entry.grid(row=0, column=1, padx=(0, 5))
@@ -385,6 +395,26 @@ class DiceRollerApp:
         
         # Bind Enter key to roll dice
         self.root.bind('<Return>', lambda event: self.roll_dice())
+    
+    def reset_modifiers(self):
+        """Resetuje wszystkie modyfikatory do wartości domyślnych"""
+        # Reset modyfikatorów strony 1
+        self.dice1_modifier_var.set("0")
+        self.dice1_range_var.set("0")
+        self.dice1_surrounded_var.set(False)
+        self.dice1_exp_var.set(0)
+        self.dice1_defense_var.set(False)
+        self.dice1_supply_var.set(False)
+        self.dice1_fort_var.set(0)
+        
+        # Reset modyfikatorów strony 2
+        self.dice2_modifier_var.set("0")
+        self.dice2_range_var.set("0")
+        self.dice2_surrounded_var.set(False)
+        self.dice2_exp_var.set(0)
+        self.dice2_defense_var.set(False)
+        self.dice2_supply_var.set(False)
+        self.dice2_fort_var.set(0)
     
     def on_side1_attack_change(self):
         """Obsługuje zmianę ataku strony 1"""
