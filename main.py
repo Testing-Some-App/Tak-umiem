@@ -652,22 +652,9 @@ class DiceRollerApp:
         self.dice1_people_result_label.config(text=dice1_text)
         self.dice2_people_result_label.config(text=dice2_text)
         
-        # Wyświetlenie informacji o przewadze liczebnej
-        advantage_message = getattr(self, 'numerical_advantage_message', '')
-        if advantage_message:
-            if not hasattr(self, 'advantage_label'):
-                # Tworzenie labela dla przewagi liczebnej jeśli nie istnieje
-                self.advantage_label = ttk.Label(
-                    self.game_frame, 
-                    text="", 
-                    font=("Arial", 10, "bold"), 
-                    foreground="purple"
-                )
-                self.advantage_label.grid(row=3, column=0, columnspan=3, pady=(5, 0))
-            self.advantage_label.config(text=advantage_message)
-        else:
-            if hasattr(self, 'advantage_label'):
-                self.advantage_label.config(text="")
+        # Ukrycie informacji o przewadze liczebnej (teraz wyświetlana w tabeli wyników)
+        if hasattr(self, 'advantage_label'):
+            self.advantage_label.config(text="")
         
         # Aktualizacja ikon doświadczenia
         self.dice1_exp_icon.config(text="⭐ Doświadczenie +" if self.dice1_gets_exp else "")
