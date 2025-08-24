@@ -844,7 +844,7 @@ class DiceRollerApp:
             else:
                 return 0.05
         
-        def calculate_losses_for_side(enemy_result, own_people, own_fortifications, own_no_supply, own_defense_buildings, enemy_fortifications, enemy_defense_buildings, own_experience):
+        def calculate_losses_for_side(enemy_result, own_people, own_fortifications, own_no_supply, own_defense_buildings, enemy_fortifications, enemy_defense_buildings, own_experience, own_attacking, enemy_defending, enemy_in_motion):
             """Oblicza straty dla jednej strony"""
             # Bazowy procent strat na podstawie wyniku przeciwnika
             base_loss_percentage = get_base_loss_percentage_for_result(enemy_result)
@@ -889,6 +889,16 @@ class DiceRollerApp:
             if enemy_defense_buildings:
                 attack_modifier += random.uniform(0.05, 0.15)  # +5-15%
             
+            # Nowe mechaniki atak/obrona/w ruchu
+            
+            # Straty atakujących są 5% większe, gdy druga strona ma zaznaczoną obronę
+            if own_attacking and enemy_defending:
+                attack_modifier += 0.05  # +5% strat dla atakujących vs obrona
+            
+            # W przypadku zaznaczenia "W Ruchu", strona przeciwna ma straty 10% mniejsze
+            if enemy_in_motion:
+                defense_modifier -= 0.10  # -10% strat gdy przeciwnik jest w ruchu
+            
             # Końcowy procent strat (nie może być ujemny)
             final_loss_percentage = max(0.0, base_loss_percentage * defense_modifier * attack_modifier)
             
@@ -914,16 +924,27 @@ class DiceRollerApp:
         dice1_defense = self.dice1_defense_var.get()
         dice2_defense = self.dice2_defense_var.get()
         
+        # Pobieranie informacji o stanie atak/obrona/w ruchu
+        side1_attacking = self.side1_attack_var.get()
+        side1_defending = self.side1_defense_var.get()
+        side1_in_motion = self.side1_motion_var.get()
+        
+        side2_attacking = self.side2_attack_var.get()
+        side2_defending = self.side2_defense_var.get()
+        side2_in_motion = self.side2_motion_var.get()
+        
         # Obliczanie strat dla obu stron
         dice1_experience = self.dice1_exp_var.get()
         dice2_experience = self.dice2_exp_var.get()
         
         self.dice1_people_result, self.dice1_losses = calculate_losses_for_side(
-            dice2_final, self.dice1_people_original, dice1_fort, dice1_no_supply, dice1_defense, dice2_fort, dice2_defense, dice1_experience
+            dice2_final, self.dice1_people_original, dice1_fort, dice1_no_supply, dice1_defense, dice2_fort, dice2_defense, dice1_experience,
+            side1_attacking, side2_defending, side2_in_motion
         )
         
         self.dice2_people_result, self.dice2_losses = calculate_losses_for_side(
-            dice1_final, self.dice2_people_original, dice2_fort, dice2_no_supply, dice2_defense, dice1_fort, dice1_defense, dice2_experience
+            dice1_final, self.dice2_people_original, dice2_fort, dice2_no_supply, dice2_defense, dice1_fort, dice1_defense, dice2_experience,
+            side2_attacking, side1_defending, side1_in_motion
         )
     
     def add_to_history(self, dice1_final, dice2_final):
