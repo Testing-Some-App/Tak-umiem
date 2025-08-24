@@ -51,6 +51,12 @@ class DiceRollerApp:
         self.current_unit = None  # Obecnie wybrana jednostka
         self.current_unit_side = "własne"  # Strona obecnie wybranej jednostki
         
+        # Jednostki wybrane do bitwy
+        self.selected_unit_side1 = None  # Nazwa wybranej jednostki dla strony 1
+        self.selected_unit_side2 = None  # Nazwa wybranej jednostki dla strony 2
+        self.unit_side1_type = "brak"  # "własne", "wroga", "brak"
+        self.unit_side2_type = "brak"  # "własne", "wroga", "brak"
+        
         # Zmienne dla systemu atak/obrona
         self.side1_attack = True  # Strona 1 domyślnie atak
         self.side2_defense = True  # Strona 2 domyślnie obrona
@@ -296,9 +302,47 @@ class DiceRollerApp:
         separator_combat = ttk.Separator(combat_mode_frame, orient='vertical')
         separator_combat.grid(row=0, column=1, sticky=tk.N+tk.S, padx=20)
         
+        # Frame dla wyboru jednostek
+        units_selection_frame = ttk.LabelFrame(self.game_frame, text="Wybór jednostek do bitwy", padding="10")
+        units_selection_frame.grid(row=2, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(10, 10))
+        
+        # Strona 1 - wybór jednostki
+        side1_unit_frame = ttk.Frame(units_selection_frame)
+        side1_unit_frame.grid(row=0, column=0, sticky=tk.E, padx=(0, 20))
+        ttk.Label(side1_unit_frame, text="Strona 1:", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, sticky=tk.W)
+        
+        self.unit_side1_type_var = tk.StringVar(value="brak")
+        ttk.Radiobutton(side1_unit_frame, text="Własne", variable=self.unit_side1_type_var, value="własne", command=self.on_unit_type_change).grid(row=1, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Radiobutton(side1_unit_frame, text="Wroga", variable=self.unit_side1_type_var, value="wroga", command=self.on_unit_type_change).grid(row=1, column=1, sticky=tk.W, padx=(0, 5))
+        ttk.Radiobutton(side1_unit_frame, text="Brak", variable=self.unit_side1_type_var, value="brak", command=self.on_unit_type_change).grid(row=1, column=2, sticky=tk.W)
+        
+        self.unit_side1_var = tk.StringVar()
+        self.unit_side1_combo = ttk.Combobox(side1_unit_frame, textvariable=self.unit_side1_var, values=[], state="readonly", width=15)
+        self.unit_side1_combo.grid(row=2, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(5, 0))
+        self.unit_side1_combo.bind("<<ComboboxSelected>>", self.on_battle_unit_selected)
+        
+        # Strona 2 - wybór jednostki
+        side2_unit_frame = ttk.Frame(units_selection_frame)
+        side2_unit_frame.grid(row=0, column=2, sticky=tk.W, padx=(20, 0))
+        ttk.Label(side2_unit_frame, text="Strona 2:", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, sticky=tk.W)
+        
+        self.unit_side2_type_var = tk.StringVar(value="brak")
+        ttk.Radiobutton(side2_unit_frame, text="Własne", variable=self.unit_side2_type_var, value="własne", command=self.on_unit_type_change).grid(row=1, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Radiobutton(side2_unit_frame, text="Wroga", variable=self.unit_side2_type_var, value="wroga", command=self.on_unit_type_change).grid(row=1, column=1, sticky=tk.W, padx=(0, 5))
+        ttk.Radiobutton(side2_unit_frame, text="Brak", variable=self.unit_side2_type_var, value="brak", command=self.on_unit_type_change).grid(row=1, column=2, sticky=tk.W)
+        
+        self.unit_side2_var = tk.StringVar()
+        self.unit_side2_combo = ttk.Combobox(side2_unit_frame, textvariable=self.unit_side2_var, values=[], state="readonly", width=15)
+        self.unit_side2_combo.grid(row=2, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(5, 0))
+        self.unit_side2_combo.bind("<<ComboboxSelected>>", self.on_battle_unit_selected)
+        
+        # Separator pionowy
+        separator_units = ttk.Separator(units_selection_frame, orient='vertical')
+        separator_units.grid(row=0, column=1, sticky=tk.N+tk.S, padx=20)
+        
         # Frame dla wyników kości (horizontal layout)
         dice_frame = ttk.LabelFrame(self.game_frame, text="Wyniki", padding="15")
-        dice_frame.grid(row=2, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 20))
+        dice_frame.grid(row=3, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 20))
         
         # Pierwsza strona - liczba ludzi i nazwa
         people1_frame = ttk.Frame(dice_frame)
@@ -383,7 +427,7 @@ class DiceRollerApp:
             font=("Arial", 12, "bold"),
             foreground="darkgreen"
         )
-        self.tactical_result_label.grid(row=3, column=0, columnspan=3, pady=(10, 5))
+        self.tactical_result_label.grid(row=4, column=0, columnspan=3, pady=(10, 5))
         
         # Przycisk do generowania wyniku
         self.roll_button = ttk.Button(
@@ -392,7 +436,7 @@ class DiceRollerApp:
             command=self.roll_dice,
             style="Roll.TButton"
         )
-        self.roll_button.grid(row=4, column=0, columnspan=3, pady=(5, 20))
+        self.roll_button.grid(row=5, column=0, columnspan=3, pady=(5, 20))
         
         # Stylizacja przycisków
         style = ttk.Style()
@@ -401,7 +445,7 @@ class DiceRollerApp:
         
         # Frame dla modyfikatorów
         modifiers_frame = ttk.LabelFrame(self.game_frame, text="Modyfikatory", padding="10")
-        modifiers_frame.grid(row=5, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(10, 0))
+        modifiers_frame.grid(row=6, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(10, 0))
         
         # Przycisk Reset na górze modyfikatorów
         reset_button = ttk.Button(
@@ -519,7 +563,7 @@ class DiceRollerApp:
             font=("Arial", 10),
             foreground="gray"
         )
-        info_label.grid(row=6, column=0, columnspan=3, pady=(10, 0))
+        info_label.grid(row=7, column=0, columnspan=3, pady=(10, 0))
         
         # Konfiguracja rozciągania kolumn
         main_frame.columnconfigure(0, weight=2)  # Gra
@@ -774,13 +818,16 @@ class DiceRollerApp:
         # Informacja o przewadze liczebnej wyświetlana w tabeli wyników
         
         # Aktualizacja ikon doświadczenia
-        self.dice1_exp_icon.config(text="⭐ Doświadczenie +" if self.dice1_gets_exp else "")
-        self.dice2_exp_icon.config(text="⭐ Doświadczenie +" if self.dice2_gets_exp else "")
+        self.dice1_exp_icon.config(text="⭐ Zwycięstwo" if self.dice1_gets_exp else "")
+        self.dice2_exp_icon.config(text="⭐ Zwycięstwo" if self.dice2_gets_exp else "")
+        
+        # Aktualizacja statystyk jednostek po rzucie
+        self.update_unit_stats_after_battle(dice1_final, dice2_final)
         
         # Obliczanie i wyświetlanie wyników taktycznych
         self.calculate_and_display_tactical_results(dice1_final, dice2_final)
         
-        # Dodanie do historii
+        # Dodanie do historii (bez informacji o jednostkach)
         self.add_to_history(dice1_final, dice2_final)
         
         # Efekt wizualny - krótka animacja przycisku
@@ -864,8 +911,8 @@ class DiceRollerApp:
         if self.dice1_people_original == 0 and self.dice2_people_original == 0:
             return
         
-        # Przy różnicy +2, wyższa strona dostaje ikonkę "Doświadczenie +"
-        if difference >= 2:
+        # Przy różnicy +1, wyższa strona dostaje ikonkę "Zwycięstwo"
+        if difference >= 1:
             if dice1_final > dice2_final:
                 self.dice1_gets_exp = True
             elif dice2_final > dice1_final:
@@ -1291,6 +1338,7 @@ class DiceRollerApp:
                 
                 # Aktualizacja interfejsu
                 self.update_units_combos()
+                self.update_battle_units_combos()
                 self.hide_unit_details()
                 
                 messagebox.showinfo("Sukces", f"Wykaz jednostek wczytany z: {filename}")
@@ -1309,13 +1357,8 @@ class DiceRollerApp:
             messagebox.showwarning("Błąd", "Jednostka o tej nazwie już istnieje!")
             return
         
-        # Dialog wyboru strony
-        choice = messagebox.askyesnocancel("Wybór strony", 
-                                          "Wybierz stronę jednostki:\n\nTak = Własna\nNie = Wroga\nAnuluj = Anuluj")
-        if choice is None:  # Anuluj
-            return
-        
-        side = "własne" if choice else "wroga"
+        # Domyślnie tworzymy jako własną jednostkę
+        side = "własne"
         
         # Tworzenie nowej jednostki z domyślnymi wartościami
         unit_data = {
@@ -1324,7 +1367,8 @@ class DiceRollerApp:
             "doświadczenie": 0,
             "zapasy": 3,
             "liczba_zwycięstw": 0,
-            "liczba_uzupełnień": 0
+            "liczba_uzupełnień": 0,
+            "strona": "własne"  # Dodane pole strony
         }
         
         # Dodanie jednostki
@@ -1336,19 +1380,15 @@ class DiceRollerApp:
         # Automatyczne wybranie utworzonej jednostki
         self.current_unit = unit_name
         self.current_unit_side = side
-        if side == "własne":
-            self.own_units_var.set(unit_name)
-            self.enemy_units_var.set("")
-        else:
-            self.enemy_units_var.set(unit_name)
-            self.own_units_var.set("")
+        self.own_units_var.set(unit_name)
+        self.enemy_units_var.set("")
         
         self.show_unit_details()
         
         # Wyczyszczenie pola nazwy
         self.new_unit_name_var.set("")
         
-        messagebox.showinfo("Sukces", f"Utworzono jednostkę: {unit_name} ({side})")
+        messagebox.showinfo("Sukces", f"Utworzono jednostkę: {unit_name}")
     
     def on_unit_selected(self, side):
         """Obsługuje wybór jednostki"""
@@ -1401,6 +1441,15 @@ class DiceRollerApp:
         self.unit_name_entry = ttk.Entry(self.unit_details_frame, textvariable=self.unit_name_var, width=15)
         self.unit_name_entry.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 5))
         self.unit_name_entry.bind('<KeyRelease>', self.on_unit_data_change)
+        
+        # Strona jednostki
+        row += 1
+        ttk.Label(self.unit_details_frame, text="Strona:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.unit_side_var = tk.StringVar(value=unit_data.get("strona", self.current_unit_side))
+        unit_side_combo = ttk.Combobox(self.unit_details_frame, textvariable=self.unit_side_var, 
+                                      values=["własne", "wroga"], state="readonly", width=10)
+        unit_side_combo.grid(row=row, column=1, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        unit_side_combo.bind("<<ComboboxSelected>>", self.on_unit_side_change)
         
         # Liczba ludzi (format X/150)
         row += 1
@@ -1521,6 +1570,9 @@ class DiceRollerApp:
         except ValueError:
             # Ignoruj błędy konwersji podczas wpisywania
             pass
+        except KeyError:
+            # Ignoruj błędy gdy jednostka nie istnieje (może być w trakcie przenoszenia)
+            pass
     
     def export_unit_data(self):
         """Eksportuje dane jednostki w określonym formacie"""
@@ -1571,6 +1623,154 @@ class DiceRollerApp:
         text_widget.tag_add(tk.SEL, "1.0", tk.END)
         text_widget.mark_set(tk.INSERT, "1.0")
         text_widget.focus()
+    
+    # === FUNKCJE DLA WYBORU JEDNOSTEK DO BITWY ===
+    
+    def on_unit_type_change(self):
+        """Obsługuje zmianę typu jednostki (własne/wroga/brak)"""
+        # Aktualizacja comboboxów dla strony 1
+        unit_type1 = self.unit_side1_type_var.get()
+        if unit_type1 == "brak":
+            self.unit_side1_combo.config(values=[], state="disabled")
+            self.unit_side1_var.set("")
+            self.selected_unit_side1 = None
+        else:
+            units_list = list(self.units[unit_type1].keys())
+            self.unit_side1_combo.config(values=units_list, state="readonly")
+            self.unit_side1_var.set("")
+            self.selected_unit_side1 = None
+        
+        # Aktualizacja comboboxów dla strony 2
+        unit_type2 = self.unit_side2_type_var.get()
+        if unit_type2 == "brak":
+            self.unit_side2_combo.config(values=[], state="disabled")
+            self.unit_side2_var.set("")
+            self.selected_unit_side2 = None
+        else:
+            units_list = list(self.units[unit_type2].keys())
+            self.unit_side2_combo.config(values=units_list, state="readonly")
+            self.unit_side2_var.set("")
+            self.selected_unit_side2 = None
+        
+        # Zapisz typy jednostek
+        self.unit_side1_type = unit_type1
+        self.unit_side2_type = unit_type2
+        
+        # Wyczyść pola doświadczenia i liczby ludzi
+        self.dice1_exp_var.set(0)
+        self.dice2_exp_var.set(0)
+        self.dice1_people_var.set("0")
+        self.dice2_people_var.set("0")
+        self.update_exp_bonuses_display()
+    
+    def on_battle_unit_selected(self, event=None):
+        """Obsługuje wybór konkretnej jednostki do bitwy"""
+        if not event:
+            return
+            
+        # Strona 1
+        if hasattr(event, 'widget') and event.widget == self.unit_side1_combo:
+            unit_name = self.unit_side1_var.get()
+            if unit_name and self.unit_side1_type != "brak":
+                self.selected_unit_side1 = unit_name
+                # Automatyczne wypełnienie danych z jednostki
+                unit_data = self.units[self.unit_side1_type][unit_name]
+                self.dice1_exp_var.set(unit_data["doświadczenie"])
+                self.dice1_people_var.set(str(unit_data["liczba_ludzi"]))
+                self.update_exp_bonuses_display()
+        
+        # Strona 2
+        if hasattr(event, 'widget') and event.widget == self.unit_side2_combo:
+            unit_name = self.unit_side2_var.get()
+            if unit_name and self.unit_side2_type != "brak":
+                self.selected_unit_side2 = unit_name
+                # Automatyczne wypełnienie danych z jednostki
+                unit_data = self.units[self.unit_side2_type][unit_name]
+                self.dice2_exp_var.set(unit_data["doświadczenie"])
+                self.dice2_people_var.set(str(unit_data["liczba_ludzi"]))
+                self.update_exp_bonuses_display()
+    
+    def update_battle_units_combos(self):
+        """Aktualizuje comboboxi wyboru jednostek do bitwy po załadowaniu danych"""
+        self.on_unit_type_change()
+    
+    def on_unit_side_change(self, event=None):
+        """Obsługuje zmianę strony jednostki w szczegółach"""
+        if not self.current_unit or self.current_unit_side not in self.units:
+            return
+        
+        if self.current_unit not in self.units[self.current_unit_side]:
+            return
+        
+        new_side = self.unit_side_var.get()
+        old_side = self.current_unit_side
+        
+        if new_side != old_side:
+            # Sprawdź czy nazwa już istnieje po drugiej stronie
+            if self.current_unit in self.units[new_side]:
+                messagebox.showwarning("Błąd", f"Jednostka o nazwie '{self.current_unit}' już istnieje po stronie '{new_side}'!")
+                self.unit_side_var.set(old_side)  # Przywróć poprzednią wartość
+                return
+            
+            # Przenieś jednostkę
+            unit_data = self.units[old_side][self.current_unit]
+            unit_data["strona"] = new_side
+            
+            del self.units[old_side][self.current_unit]
+            self.units[new_side][self.current_unit] = unit_data
+            
+            # Aktualizuj stan
+            self.current_unit_side = new_side
+            
+            # Aktualizuj interfejs
+            self.update_units_combos()
+            self.update_battle_units_combos()
+            
+            # Zaktualizuj wybór w głównych comboboxach
+            if new_side == "własne":
+                self.own_units_var.set(self.current_unit)
+                self.enemy_units_var.set("")
+            else:
+                self.enemy_units_var.set(self.current_unit)
+                self.own_units_var.set("")
+            
+            # Zaktualizuj tytuł szczegółów
+            self.unit_details_frame.config(text=f"Szczegóły: {self.current_unit} ({new_side})")
+            
+            messagebox.showinfo("Sukces", f"Jednostka '{self.current_unit}' przeniesiona na stronę '{new_side}'")
+    
+    def update_unit_stats_after_battle(self, dice1_final, dice2_final):
+        """Aktualizuje statystyki jednostek po bitwie"""
+        # Aktualizacja jednostki strony 1
+        if self.selected_unit_side1 and self.unit_side1_type != "brak":
+            if self.selected_unit_side1 in self.units[self.unit_side1_type]:
+                unit_data = self.units[self.unit_side1_type][self.selected_unit_side1]
+                
+                # Aktualizacja liczby ludzi
+                unit_data["liczba_ludzi"] = self.dice1_people_result
+                
+                # Aktualizacja zwycięstw (jeśli rzut > 1 i wygrała)
+                if dice1_final > 1 and dice1_final > dice2_final:
+                    unit_data["liczba_zwycięstw"] += 1
+        
+        # Aktualizacja jednostki strony 2
+        if self.selected_unit_side2 and self.unit_side2_type != "brak":
+            if self.selected_unit_side2 in self.units[self.unit_side2_type]:
+                unit_data = self.units[self.unit_side2_type][self.selected_unit_side2]
+                
+                # Aktualizacja liczby ludzi
+                unit_data["liczba_ludzi"] = self.dice2_people_result
+                
+                # Aktualizacja zwycięstw (jeśli rzut > 1 i wygrała)
+                if dice2_final > 1 and dice2_final > dice1_final:
+                    unit_data["liczba_zwycięstw"] += 1
+        
+        # Aktualizacja interfejsu jednostek jeśli jakaś jest aktualnie wyświetlana
+        if self.current_unit:
+            self.show_unit_details()
+        
+        # Aktualizacja comboboxów wyboru jednostek do bitwy
+        self.update_battle_units_combos()
 
 
 def main():
