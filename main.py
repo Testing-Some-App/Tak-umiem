@@ -8,14 +8,17 @@ Simple Polish tkinter application for rolling two 4-sided dice
 import tkinter as tk
 from tkinter import ttk
 from tkinter import scrolledtext
+from tkinter import filedialog, messagebox
 import random
+import json
+from datetime import datetime
 
 
 class DiceRollerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Rzut dwoma 4-ściennymi kośćmi")
-        self.root.geometry("1200x700")
+        self.root.geometry("1600x700")
         self.root.resizable(False, False)
         
         # Centrowanie okna na ekranie
@@ -37,6 +40,11 @@ class DiceRollerApp:
         self.dice1_losses = 0
         self.dice2_losses = 0
         self.history = []  # Lista przechowująca historię rzutów
+        
+        # System bitew
+        self.battles = {}  # Słownik bitew: {nazwa: {"history": [], "created": datetime}}
+        self.current_battle = "Niezapisana"  # Obecnie wybrana bitwa
+        self.battle_names = ["Niezapisana"]  # Lista nazw bitew dla combobox
         
         # Zmienne dla systemu atak/obrona
         self.side1_attack = True  # Strona 1 domyślnie atak
@@ -89,19 +97,69 @@ class DiceRollerApp:
         self.game_frame = ttk.Frame(main_frame)
         self.game_frame.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S, padx=(0, 10))
         
-        # Frame po prawej stronie (historia)
+        # Frame środkowy (historia ostatnich rzutów)
         history_frame = ttk.LabelFrame(main_frame, text="Historia ostatnich 12 rzutów", padding="10")
-        history_frame.grid(row=0, column=1, sticky=tk.W+tk.E+tk.N+tk.S)
+        history_frame.grid(row=0, column=1, sticky=tk.W+tk.E+tk.N+tk.S, padx=(5, 5))
         
         # Scrollable text widget dla historii
         self.history_text = scrolledtext.ScrolledText(
             history_frame, 
-            width=40, 
+            width=35, 
             height=35, 
             font=("Arial", 9),
             state=tk.DISABLED
         )
         self.history_text.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
+        
+        # Frame po prawej stronie (historia bitew)
+        battles_frame = ttk.LabelFrame(main_frame, text="Historia bitew", padding="10")
+        battles_frame.grid(row=0, column=2, sticky=tk.W+tk.E+tk.N+tk.S, padx=(5, 0))
+        
+        # Wybor bitwy
+        battle_selection_frame = ttk.Frame(battles_frame)
+        battle_selection_frame.grid(row=0, column=0, sticky=tk.W+tk.E, pady=(0, 10))
+        
+        ttk.Label(battle_selection_frame, text="Wybierz bitwę:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W)
+        
+        self.battle_var = tk.StringVar(value="Niezapisana")
+        self.battle_combo = ttk.Combobox(battle_selection_frame, textvariable=self.battle_var, 
+                                        values=self.battle_names, state="readonly", width=20)
+        self.battle_combo.grid(row=1, column=0, sticky=tk.W+tk.E, pady=(5, 0))
+        self.battle_combo.bind("<<ComboboxSelected>>", self.on_battle_selected)
+        
+        # Tworzenie nowej bitwy
+        new_battle_frame = ttk.Frame(battles_frame)
+        new_battle_frame.grid(row=1, column=0, sticky=tk.W+tk.E, pady=(10, 10))
+        
+        ttk.Label(new_battle_frame, text="Nowa bitwa:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W)
+        
+        self.new_battle_var = tk.StringVar()
+        self.new_battle_entry = ttk.Entry(new_battle_frame, textvariable=self.new_battle_var, width=15)
+        self.new_battle_entry.grid(row=1, column=0, sticky=tk.W+tk.E, pady=(5, 5))
+        
+        ttk.Button(new_battle_frame, text="Stwórz", command=self.create_new_battle).grid(row=1, column=1, padx=(5, 0), pady=(5, 5))
+        
+        # Informacje o stratach dla wybranej bitwy
+        self.battle_stats_label = ttk.Label(battles_frame, text="", font=("Arial", 9), 
+                                           foreground="blue", justify=tk.LEFT)
+        self.battle_stats_label.grid(row=2, column=0, sticky=tk.W+tk.E, pady=(10, 10))
+        
+        # Historia wybranej bitwy
+        self.battle_history_text = scrolledtext.ScrolledText(
+            battles_frame, 
+            width=35, 
+            height=25, 
+            font=("Arial", 9),
+            state=tk.DISABLED
+        )
+        self.battle_history_text.grid(row=3, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
+        
+        # Przyciski zapisz/wczytaj
+        save_load_frame = ttk.Frame(battles_frame)
+        save_load_frame.grid(row=4, column=0, sticky=tk.W+tk.E, pady=(10, 0))
+        
+        ttk.Button(save_load_frame, text="Zapisz rejestr", command=self.save_battles).grid(row=0, column=0, padx=(0, 5))
+        ttk.Button(save_load_frame, text="Wczytaj rejestr", command=self.load_battles).grid(row=0, column=1, padx=(5, 0))
         
         # Bind scroll wheel to canvas for both vertical and horizontal scrolling
         def _on_mousewheel(event):
@@ -410,6 +468,7 @@ class DiceRollerApp:
         # Konfiguracja rozciągania kolumn
         main_frame.columnconfigure(0, weight=2)  # Gra
         main_frame.columnconfigure(1, weight=1)  # Historia
+        main_frame.columnconfigure(2, weight=1)  # Bitwy
         self.game_frame.columnconfigure(0, weight=1)
         self.game_frame.columnconfigure(1, weight=1)
         self.game_frame.columnconfigure(2, weight=1)
@@ -422,6 +481,12 @@ class DiceRollerApp:
         modifiers_frame.columnconfigure(1, weight=1)
         history_frame.columnconfigure(0, weight=1)
         history_frame.rowconfigure(0, weight=1)
+        battles_frame.columnconfigure(0, weight=1)
+        battles_frame.rowconfigure(3, weight=1)
+        battle_selection_frame.columnconfigure(0, weight=1)
+        new_battle_frame.columnconfigure(0, weight=1)
+        save_load_frame.columnconfigure(0, weight=1)
+        save_load_frame.columnconfigure(1, weight=1)
         
         # Focus na przycisk
         self.roll_button.focus()
@@ -881,8 +946,16 @@ class DiceRollerApp:
         if len(self.history) > 12:
             self.history.pop(0)
         
+        # Dodanie do historii wybranej bitwy (jeśli nie "Niezapisana")
+        if self.current_battle != "Niezapisana":
+            if self.current_battle not in self.battles:
+                self.battles[self.current_battle] = {"history": [], "created": datetime.now().isoformat()}
+            self.battles[self.current_battle]["history"].append(history_entry)
+        
         # Aktualizacja wyświetlania historii
         self.update_history_display()
+        self.update_battle_stats()
+        self.update_battle_history_display()
     
     def update_history_display(self):
         """Aktualizuje wyświetlanie historii"""
@@ -940,6 +1013,152 @@ class DiceRollerApp:
         original_title = self.root.title()
         self.root.title(f"Rzut dwoma 4-ściennymi kośćmi - {message}")
         self.root.after(2000, lambda: self.root.title(original_title))
+    
+    def on_battle_selected(self, event=None):
+        """Obsługuje wybór bitwy z combobox"""
+        self.current_battle = self.battle_var.get()
+        self.update_battle_stats()
+        self.update_battle_history_display()
+    
+    def create_new_battle(self):
+        """Tworzy nową bitwę"""
+        battle_name = self.new_battle_var.get().strip()
+        if not battle_name:
+            messagebox.showwarning("Błąd", "Wprowadź nazwę bitwy!")
+            return
+        
+        if battle_name in self.battle_names:
+            messagebox.showwarning("Błąd", "Bitwa o tej nazwie już istnieje!")
+            return
+        
+        if battle_name == "Niezapisana":
+            messagebox.showwarning("Błąd", "Nazwa 'Niezapisana' jest zarezerwowana!")
+            return
+        
+        # Dodanie nowej bitwy
+        self.battle_names.append(battle_name)
+        self.battles[battle_name] = {"history": [], "created": datetime.now().isoformat()}
+        
+        # Aktualizacja combobox
+        self.battle_combo.config(values=self.battle_names)
+        self.battle_var.set(battle_name)
+        self.current_battle = battle_name
+        
+        # Wyczyszczenie pola nazwy
+        self.new_battle_var.set("")
+        
+        # Aktualizacja wyświetlania
+        self.update_battle_stats()
+        self.update_battle_history_display()
+        
+        messagebox.showinfo("Sukces", f"Utworzono bitwę: {battle_name}")
+    
+    def update_battle_stats(self):
+        """Aktualizuje wyświetlanie statystyk wybranej bitwy"""
+        if self.current_battle == "Niezapisana" or self.current_battle not in self.battles:
+            self.battle_stats_label.config(text="")
+            return
+        
+        battle_history = self.battles[self.current_battle]["history"]
+        if not battle_history:
+            self.battle_stats_label.config(text="Brak rzutów w tej bitwie.")
+            return
+        
+        # Obliczanie sumarycznych strat
+        total_losses_1 = 0
+        total_losses_2 = 0
+        
+        for entry in battle_history:
+            losses_1 = entry['people1_before'] - entry['people1_after']
+            losses_2 = entry['people2_before'] - entry['people2_after']
+            total_losses_1 += losses_1
+            total_losses_2 += losses_2
+        
+        stats_text = f"Sumaryczne straty:\nStrona 1: {total_losses_1} ludzi\nStrona 2: {total_losses_2} ludzi\n\nLiczba rzutów: {len(battle_history)}"
+        self.battle_stats_label.config(text=stats_text)
+    
+    def update_battle_history_display(self):
+        """Aktualizuje wyświetlanie historii wybranej bitwy"""
+        self.battle_history_text.config(state=tk.NORMAL)
+        self.battle_history_text.delete(1.0, tk.END)
+        
+        if self.current_battle == "Niezapisana" or self.current_battle not in self.battles:
+            self.battle_history_text.config(state=tk.DISABLED)
+            return
+        
+        battle_history = self.battles[self.current_battle]["history"]
+        
+        for i, entry in enumerate(battle_history, 1):
+            exp1_icon = " ⭐" if entry['exp1'] else ""
+            exp2_icon = " ⭐" if entry['exp2'] else ""
+            
+            history_line = f"#{i}: Strona 1: {entry['dice1']}{exp1_icon} | Strona 2: {entry['dice2']}{exp2_icon}\n"
+            history_line += f"    Ludzie: {entry['people1_before']}→{entry['people1_after']} | {entry['people2_before']}→{entry['people2_after']}\n\n"
+            
+            self.battle_history_text.insert(tk.END, history_line)
+        
+        self.battle_history_text.config(state=tk.DISABLED)
+        self.battle_history_text.see(tk.END)
+    
+    def save_battles(self):
+        """Zapisuje rejestr bitew do pliku JSON"""
+        try:
+            filename = filedialog.asksaveasfilename(
+                title="Zapisz rejestr bitew",
+                defaultextension=".json",
+                filetypes=[("Pliki JSON", "*.json"), ("Wszystkie pliki", "*.*")]
+            )
+            
+            if filename:
+                data = {
+                    "battles": self.battles,
+                    "battle_names": self.battle_names,
+                    "saved_at": datetime.now().isoformat()
+                }
+                
+                with open(filename, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                
+                messagebox.showinfo("Sukces", f"Rejestr bitew zapisany do: {filename}")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie udało się zapisać rejestru: {str(e)}")
+    
+    def load_battles(self):
+        """Wczytuje rejestr bitew z pliku JSON"""
+        try:
+            filename = filedialog.askopenfilename(
+                title="Wczytaj rejestr bitew",
+                filetypes=[("Pliki JSON", "*.json"), ("Wszystkie pliki", "*.*")]
+            )
+            
+            if filename:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                # Sprawdzenie struktury danych
+                if "battles" not in data or "battle_names" not in data:
+                    messagebox.showerror("Błąd", "Nieprawidłowy format pliku!")
+                    return
+                
+                # Wczytanie danych
+                self.battles = data["battles"]
+                self.battle_names = data["battle_names"]
+                
+                # Upewnienie się, że "Niezapisana" jest na początku
+                if "Niezapisana" not in self.battle_names:
+                    self.battle_names.insert(0, "Niezapisana")
+                
+                # Aktualizacja interfejsu
+                self.battle_combo.config(values=self.battle_names)
+                self.battle_var.set("Niezapisana")
+                self.current_battle = "Niezapisana"
+                
+                self.update_battle_stats()
+                self.update_battle_history_display()
+                
+                messagebox.showinfo("Sukces", f"Rejestr bitew wczytany z: {filename}")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie udało się wczytać rejestru: {str(e)}")
 
 
 def main():
