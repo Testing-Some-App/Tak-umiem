@@ -113,7 +113,8 @@ class DiceRollerApp:
                 # Vertical scrolling (default)
                 canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        canvas.bind("<MouseWheel>", _on_mousewheel)
+        # Bindowanie do całego okna aplikacji, żeby działało wszędzie
+        self.root.bind("<MouseWheel>", _on_mousewheel)
         
         # Dodatkowe bindowanie dla systemów Linux/Unix (Button-4 i Button-5)
         def _on_mousewheel_linux_up(event):
@@ -128,8 +129,8 @@ class DiceRollerApp:
             else:
                 canvas.yview_scroll(1, "units")
         
-        canvas.bind("<Button-4>", _on_mousewheel_linux_up)
-        canvas.bind("<Button-5>", _on_mousewheel_linux_down)
+        self.root.bind("<Button-4>", _on_mousewheel_linux_up)
+        self.root.bind("<Button-5>", _on_mousewheel_linux_down)
         
         # Tytuł aplikacji
         title_label = ttk.Label(
