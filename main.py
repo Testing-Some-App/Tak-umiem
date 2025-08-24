@@ -103,10 +103,33 @@ class DiceRollerApp:
         )
         self.history_text.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
         
-        # Bind scroll wheel to canvas
+        # Bind scroll wheel to canvas for both vertical and horizontal scrolling
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            # Sprawdzenie czy wciśnięty jest Shift
+            if event.state & 0x1:  # Shift is pressed
+                # Horizontal scrolling
+                canvas.xview_scroll(int(-1*(event.delta/120)), "units")
+            else:
+                # Vertical scrolling (default)
+                canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
         canvas.bind("<MouseWheel>", _on_mousewheel)
+        
+        # Dodatkowe bindowanie dla systemów Linux/Unix (Button-4 i Button-5)
+        def _on_mousewheel_linux_up(event):
+            if event.state & 0x1:  # Shift is pressed
+                canvas.xview_scroll(-1, "units")
+            else:
+                canvas.yview_scroll(-1, "units")
+        
+        def _on_mousewheel_linux_down(event):
+            if event.state & 0x1:  # Shift is pressed
+                canvas.xview_scroll(1, "units")
+            else:
+                canvas.yview_scroll(1, "units")
+        
+        canvas.bind("<Button-4>", _on_mousewheel_linux_up)
+        canvas.bind("<Button-5>", _on_mousewheel_linux_down)
         
         # Tytuł aplikacji
         title_label = ttk.Label(
