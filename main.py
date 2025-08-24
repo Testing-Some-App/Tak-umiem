@@ -715,8 +715,9 @@ class DiceRollerApp:
             if own_no_supply:
                 defense_modifier += 0.05  # +5%
             
-            # Obrona w zabudowaniach już nie wpływa na własne straty
-            # (przeniesione do modyfikatorów ataku przeciwnika)
+            # Obrona w zabudowaniach zmniejsza straty własne
+            if own_defense_buildings:
+                defense_modifier -= 0.05  # -5%
             
             # Negatywne doświadczenie zwiększa straty własne
             if own_experience == -1:
