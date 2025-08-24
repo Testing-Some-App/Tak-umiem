@@ -118,11 +118,11 @@ class DiceRollerApp:
         
         # Frame dla ustawień atak/obrona/w ruchu
         combat_mode_frame = ttk.LabelFrame(game_frame, text="Rodzaj działania", padding="10")
-        combat_mode_frame.grid(row=1, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 10))
+        combat_mode_frame.grid(row=1, column=0, columnspan=3, pady=(0, 10))
         
         # Strona 1 - opcje
         side1_frame = ttk.Frame(combat_mode_frame)
-        side1_frame.grid(row=0, column=0, padx=20, sticky=tk.W)
+        side1_frame.grid(row=0, column=0, sticky=tk.E, padx=(0, 20))
         ttk.Label(side1_frame, text="Strona 1:", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, sticky=tk.W)
         
         self.side1_attack_var = tk.BooleanVar(value=True)
@@ -139,7 +139,7 @@ class DiceRollerApp:
         
         # Strona 2 - opcje
         side2_frame = ttk.Frame(combat_mode_frame)
-        side2_frame.grid(row=0, column=2, padx=20, sticky=tk.W)
+        side2_frame.grid(row=0, column=2, sticky=tk.W, padx=(20, 0))
         ttk.Label(side2_frame, text="Strona 2:", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, sticky=tk.W)
         
         self.side2_attack_var = tk.BooleanVar(value=False)
@@ -156,7 +156,7 @@ class DiceRollerApp:
         
         # Separator pionowy
         separator_combat = ttk.Separator(combat_mode_frame, orient='vertical')
-        separator_combat.grid(row=0, column=1, sticky=tk.N+tk.S, padx=10)
+        separator_combat.grid(row=0, column=1, sticky=tk.N+tk.S, padx=20)
         
         # Frame dla wyników kości (horizontal layout)
         dice_frame = ttk.LabelFrame(game_frame, text="Wyniki", padding="15")
@@ -372,6 +372,9 @@ class DiceRollerApp:
         game_frame.columnconfigure(2, weight=1)
         dice_frame.columnconfigure(0, weight=1)
         dice_frame.columnconfigure(2, weight=1)
+        combat_mode_frame.columnconfigure(0, weight=1)
+        combat_mode_frame.columnconfigure(1, weight=0)
+        combat_mode_frame.columnconfigure(2, weight=1)
         modifiers_frame.columnconfigure(0, weight=1)
         modifiers_frame.columnconfigure(1, weight=1)
         history_frame.columnconfigure(0, weight=1)
