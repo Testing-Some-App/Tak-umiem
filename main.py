@@ -18,7 +18,7 @@ class DiceRollerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Rzut dwoma 4-ściennymi kośćmi")
-        self.root.geometry("1600x700")
+        self.root.geometry("2000x700")
         self.root.resizable(False, False)
         
         # Centrowanie okna na ekranie
@@ -45,6 +45,11 @@ class DiceRollerApp:
         self.battles = {}  # Słownik bitew: {nazwa: {"history": [], "created": datetime}}
         self.current_battle = "Niezapisana"  # Obecnie wybrana bitwa
         self.battle_names = ["Niezapisana"]  # Lista nazw bitew dla combobox
+        
+        # System jednostek
+        self.units = {"własne": {}, "wroga": {}}  # Słownik jednostek: {"własne": {nazwa: dane}, "wroga": {nazwa: dane}}
+        self.current_unit = None  # Obecnie wybrana jednostka
+        self.current_unit_side = "własne"  # Strona obecnie wybranej jednostki
         
         # Zmienne dla systemu atak/obrona
         self.side1_attack = True  # Strona 1 domyślnie atak
@@ -113,7 +118,11 @@ class DiceRollerApp:
         
         # Frame po prawej stronie (historia bitew)
         battles_frame = ttk.LabelFrame(main_frame, text="Historia bitew", padding="10")
-        battles_frame.grid(row=0, column=2, sticky=tk.W+tk.E+tk.N+tk.S, padx=(5, 0))
+        battles_frame.grid(row=0, column=2, sticky=tk.W+tk.E+tk.N+tk.S, padx=(5, 5))
+        
+        # Frame najdalej po prawej (wykaz jednostek)
+        units_frame = ttk.LabelFrame(main_frame, text="Wykaz Jednostek", padding="10")
+        units_frame.grid(row=0, column=3, sticky=tk.W+tk.E+tk.N+tk.S, padx=(5, 0))
         
         # Wybor bitwy
         battle_selection_frame = ttk.Frame(battles_frame)
@@ -160,6 +169,53 @@ class DiceRollerApp:
         
         ttk.Button(save_load_frame, text="Zapisz rejestr", command=self.save_battles).grid(row=0, column=0, padx=(0, 5))
         ttk.Button(save_load_frame, text="Wczytaj rejestr", command=self.load_battles).grid(row=0, column=1, padx=(5, 0))
+        
+        # === WYKAZ JEDNOSTEK ===
+        
+        # Przyciski zapisz/wczytaj jednostek
+        units_save_load_frame = ttk.Frame(units_frame)
+        units_save_load_frame.grid(row=0, column=0, sticky=tk.W+tk.E, pady=(0, 10))
+        
+        ttk.Button(units_save_load_frame, text="Zapisz", command=self.save_units).grid(row=0, column=0, padx=(0, 5))
+        ttk.Button(units_save_load_frame, text="Wczytaj", command=self.load_units).grid(row=0, column=1, padx=(5, 0))
+        
+        # Wybierz jednostkę
+        unit_selection_frame = ttk.Frame(units_frame)
+        unit_selection_frame.grid(row=1, column=0, sticky=tk.W+tk.E, pady=(0, 10))
+        
+        ttk.Label(unit_selection_frame, text="Wybierz jednostkę:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, columnspan=2)
+        
+        # Jednostki własne
+        ttk.Label(unit_selection_frame, text="Własne:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
+        self.own_units_var = tk.StringVar()
+        self.own_units_combo = ttk.Combobox(unit_selection_frame, textvariable=self.own_units_var, 
+                                           values=[], state="readonly", width=18)
+        self.own_units_combo.grid(row=2, column=0, sticky=tk.W+tk.E, pady=(2, 5))
+        self.own_units_combo.bind("<<ComboboxSelected>>", lambda e: self.on_unit_selected("własne"))
+        
+        # Jednostki wroga
+        ttk.Label(unit_selection_frame, text="Wroga:", font=("Arial", 9)).grid(row=3, column=0, sticky=tk.W)
+        self.enemy_units_var = tk.StringVar()
+        self.enemy_units_combo = ttk.Combobox(unit_selection_frame, textvariable=self.enemy_units_var, 
+                                             values=[], state="readonly", width=18)
+        self.enemy_units_combo.grid(row=4, column=0, sticky=tk.W+tk.E, pady=(2, 5))
+        self.enemy_units_combo.bind("<<ComboboxSelected>>", lambda e: self.on_unit_selected("wroga"))
+        
+        # Stwórz jednostkę
+        create_unit_frame = ttk.Frame(units_frame)
+        create_unit_frame.grid(row=2, column=0, sticky=tk.W+tk.E, pady=(10, 10))
+        
+        ttk.Label(create_unit_frame, text="Stwórz jednostkę:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, columnspan=2)
+        
+        self.new_unit_name_var = tk.StringVar()
+        self.new_unit_name_entry = ttk.Entry(create_unit_frame, textvariable=self.new_unit_name_var, width=15)
+        self.new_unit_name_entry.grid(row=1, column=0, sticky=tk.W+tk.E, pady=(5, 5))
+        
+        ttk.Button(create_unit_frame, text="Stwórz", command=self.create_new_unit).grid(row=1, column=1, padx=(5, 0), pady=(5, 5))
+        
+        # Frame dla szczegółów jednostki (początkowo ukryty)
+        self.unit_details_frame = ttk.LabelFrame(units_frame, text="Szczegóły jednostki", padding="10")
+        # Nie gridujemy go na początku - pojawi się po wybraniu jednostki
         
         # Bind scroll wheel to canvas for both vertical and horizontal scrolling
         def _on_mousewheel(event):
@@ -469,6 +525,7 @@ class DiceRollerApp:
         main_frame.columnconfigure(0, weight=2)  # Gra
         main_frame.columnconfigure(1, weight=1)  # Historia
         main_frame.columnconfigure(2, weight=1)  # Bitwy
+        main_frame.columnconfigure(3, weight=1)  # Jednostki
         self.game_frame.columnconfigure(0, weight=1)
         self.game_frame.columnconfigure(1, weight=1)
         self.game_frame.columnconfigure(2, weight=1)
@@ -1181,6 +1238,339 @@ class DiceRollerApp:
                 messagebox.showinfo("Sukces", f"Rejestr bitew wczytany z: {filename}")
         except Exception as e:
             messagebox.showerror("Błąd", f"Nie udało się wczytać rejestru: {str(e)}")
+    
+    # === FUNKCJE DLA ZARZĄDZANIA JEDNOSTKAMI ===
+    
+    def save_units(self):
+        """Zapisuje wykaz jednostek do pliku JSON"""
+        try:
+            filename = filedialog.asksaveasfilename(
+                title="Zapisz wykaz jednostek",
+                defaultextension=".json",
+                filetypes=[("Pliki JSON", "*.json"), ("Wszystkie pliki", "*.*")]
+            )
+            
+            if filename:
+                data = {
+                    "units": self.units,
+                    "saved_at": datetime.now().isoformat()
+                }
+                
+                with open(filename, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                
+                messagebox.showinfo("Sukces", f"Wykaz jednostek zapisany do: {filename}")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie udało się zapisać wykazu: {str(e)}")
+    
+    def load_units(self):
+        """Wczytuje wykaz jednostek z pliku JSON"""
+        try:
+            filename = filedialog.askopenfilename(
+                title="Wczytaj wykaz jednostek",
+                filetypes=[("Pliki JSON", "*.json"), ("Wszystkie pliki", "*.*")]
+            )
+            
+            if filename:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                # Sprawdzenie struktury danych
+                if "units" not in data:
+                    messagebox.showerror("Błąd", "Nieprawidłowy format pliku!")
+                    return
+                
+                # Wczytanie danych
+                self.units = data["units"]
+                
+                # Upewnienie się o prawidłowej strukturze
+                if "własne" not in self.units:
+                    self.units["własne"] = {}
+                if "wroga" not in self.units:
+                    self.units["wroga"] = {}
+                
+                # Aktualizacja interfejsu
+                self.update_units_combos()
+                self.hide_unit_details()
+                
+                messagebox.showinfo("Sukces", f"Wykaz jednostek wczytany z: {filename}")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie udało się wczytać wykazu: {str(e)}")
+    
+    def create_new_unit(self):
+        """Tworzy nową jednostkę"""
+        unit_name = self.new_unit_name_var.get().strip()
+        if not unit_name:
+            messagebox.showwarning("Błąd", "Wprowadź nazwę jednostki!")
+            return
+        
+        # Sprawdzenie czy jednostka już istnieje
+        if (unit_name in self.units["własne"] or unit_name in self.units["wroga"]):
+            messagebox.showwarning("Błąd", "Jednostka o tej nazwie już istnieje!")
+            return
+        
+        # Dialog wyboru strony
+        choice = messagebox.askyesnocancel("Wybór strony", 
+                                          "Wybierz stronę jednostki:\n\nTak = Własna\nNie = Wroga\nAnuluj = Anuluj")
+        if choice is None:  # Anuluj
+            return
+        
+        side = "własne" if choice else "wroga"
+        
+        # Tworzenie nowej jednostki z domyślnymi wartościami
+        unit_data = {
+            "nazwa": unit_name,
+            "liczba_ludzi": 150,
+            "doświadczenie": 0,
+            "zapasy": 3,
+            "liczba_zwycięstw": 0,
+            "liczba_uzupełnień": 0
+        }
+        
+        # Dodanie jednostki
+        self.units[side][unit_name] = unit_data
+        
+        # Aktualizacja interfejsu
+        self.update_units_combos()
+        
+        # Automatyczne wybranie utworzonej jednostki
+        self.current_unit = unit_name
+        self.current_unit_side = side
+        if side == "własne":
+            self.own_units_var.set(unit_name)
+            self.enemy_units_var.set("")
+        else:
+            self.enemy_units_var.set(unit_name)
+            self.own_units_var.set("")
+        
+        self.show_unit_details()
+        
+        # Wyczyszczenie pola nazwy
+        self.new_unit_name_var.set("")
+        
+        messagebox.showinfo("Sukces", f"Utworzono jednostkę: {unit_name} ({side})")
+    
+    def on_unit_selected(self, side):
+        """Obsługuje wybór jednostki"""
+        if side == "własne":
+            unit_name = self.own_units_var.get()
+            self.enemy_units_var.set("")  # Wyczyść drugą stronę
+        else:
+            unit_name = self.enemy_units_var.get()
+            self.own_units_var.set("")  # Wyczyść drugą stronę
+        
+        if unit_name and unit_name in self.units[side]:
+            self.current_unit = unit_name
+            self.current_unit_side = side
+            self.show_unit_details()
+        else:
+            self.hide_unit_details()
+    
+    def update_units_combos(self):
+        """Aktualizuje zawartość comboboxów jednostek"""
+        own_units = list(self.units["własne"].keys())
+        enemy_units = list(self.units["wroga"].keys())
+        
+        self.own_units_combo.config(values=own_units)
+        self.enemy_units_combo.config(values=enemy_units)
+    
+    def show_unit_details(self):
+        """Pokazuje szczegóły wybranej jednostki"""
+        if not self.current_unit or self.current_unit_side not in self.units:
+            return
+        
+        if self.current_unit not in self.units[self.current_unit_side]:
+            return
+        
+        # Pokaż frame szczegółów
+        self.unit_details_frame.grid(row=3, column=0, sticky=tk.W+tk.E+tk.N+tk.S, pady=(10, 0))
+        
+        # Uaktualnij tytuł
+        self.unit_details_frame.config(text=f"Szczegóły: {self.current_unit} ({self.current_unit_side})")
+        
+        # Usuń poprzednie contentery jeśli istnieją
+        for widget in self.unit_details_frame.winfo_children():
+            widget.destroy()
+        
+        unit_data = self.units[self.current_unit_side][self.current_unit]
+        
+        # Nazwa
+        row = 0
+        ttk.Label(self.unit_details_frame, text="Nazwa:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+        self.unit_name_var = tk.StringVar(value=unit_data["nazwa"])
+        self.unit_name_entry = ttk.Entry(self.unit_details_frame, textvariable=self.unit_name_var, width=15)
+        self.unit_name_entry.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 5))
+        self.unit_name_entry.bind('<KeyRelease>', self.on_unit_data_change)
+        
+        # Liczba ludzi (format X/150)
+        row += 1
+        ttk.Label(self.unit_details_frame, text="Ludzie:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        people_frame = ttk.Frame(self.unit_details_frame)
+        people_frame.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 5), pady=(5, 0))
+        
+        self.unit_people_var = tk.StringVar(value=str(unit_data["liczba_ludzi"]))
+        self.unit_people_entry = ttk.Entry(people_frame, textvariable=self.unit_people_var, width=5)
+        self.unit_people_entry.grid(row=0, column=0)
+        self.unit_people_entry.bind('<KeyRelease>', self.on_unit_data_change)
+        ttk.Label(people_frame, text="/150", font=("Arial", 9)).grid(row=0, column=1, padx=(2, 0))
+        
+        # Doświadczenie
+        row += 1
+        ttk.Label(self.unit_details_frame, text="Doświadczenie:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.unit_exp_var = tk.StringVar(value=str(unit_data["doświadczenie"]))
+        self.unit_exp_entry = ttk.Entry(self.unit_details_frame, textvariable=self.unit_exp_var, width=5)
+        self.unit_exp_entry.grid(row=row, column=1, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.unit_exp_entry.bind('<KeyRelease>', self.on_unit_data_change)
+        
+        # Zapasy (format X/3)
+        row += 1
+        ttk.Label(self.unit_details_frame, text="Zapasy:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        supplies_frame = ttk.Frame(self.unit_details_frame)
+        supplies_frame.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 5), pady=(5, 0))
+        
+        self.unit_supplies_var = tk.StringVar(value=str(unit_data["zapasy"]))
+        self.unit_supplies_entry = ttk.Entry(supplies_frame, textvariable=self.unit_supplies_var, width=5)
+        self.unit_supplies_entry.grid(row=0, column=0)
+        self.unit_supplies_entry.bind('<KeyRelease>', self.on_unit_data_change)
+        ttk.Label(supplies_frame, text="/3", font=("Arial", 9)).grid(row=0, column=1, padx=(2, 0))
+        
+        # Liczba zwycięstw
+        row += 1
+        ttk.Label(self.unit_details_frame, text="Zwycięstwa:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.unit_victories_var = tk.StringVar(value=str(unit_data["liczba_zwycięstw"]))
+        self.unit_victories_entry = ttk.Entry(self.unit_details_frame, textvariable=self.unit_victories_var, width=5)
+        self.unit_victories_entry.grid(row=row, column=1, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.unit_victories_entry.bind('<KeyRelease>', self.on_unit_data_change)
+        
+        # Liczba uzupełnień
+        row += 1
+        ttk.Label(self.unit_details_frame, text="Uzupełnienia:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.unit_reinforcements_var = tk.StringVar(value=str(unit_data["liczba_uzupełnień"]))
+        self.unit_reinforcements_entry = ttk.Entry(self.unit_details_frame, textvariable=self.unit_reinforcements_var, width=5)
+        self.unit_reinforcements_entry.grid(row=row, column=1, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.unit_reinforcements_entry.bind('<KeyRelease>', self.on_unit_data_change)
+        
+        # Przycisk eksportu
+        row += 1
+        ttk.Button(self.unit_details_frame, text="Eksportuj dane", command=self.export_unit_data).grid(row=row, column=0, columnspan=2, pady=(10, 0))
+    
+    def hide_unit_details(self):
+        """Ukrywa szczegóły jednostki"""
+        self.unit_details_frame.grid_remove()
+        self.current_unit = None
+        self.current_unit_side = "własne"
+    
+    def on_unit_data_change(self, event=None):
+        """Obsługuje zmiany danych jednostki"""
+        if not self.current_unit or self.current_unit_side not in self.units:
+            return
+        
+        if self.current_unit not in self.units[self.current_unit_side]:
+            return
+        
+        try:
+            # Aktualizacja danych jednostki
+            unit_data = self.units[self.current_unit_side][self.current_unit]
+            
+            # Nazwa
+            old_name = unit_data["nazwa"]
+            new_name = self.unit_name_var.get().strip()
+            if new_name and new_name != old_name:
+                # Sprawdź czy nowa nazwa już istnieje
+                if (new_name not in self.units["własne"] and new_name not in self.units["wroga"]):
+                    # Zmień nazwę klucza w słowniku
+                    del self.units[self.current_unit_side][self.current_unit]
+                    self.current_unit = new_name
+                    unit_data["nazwa"] = new_name
+                    self.units[self.current_unit_side][new_name] = unit_data
+                    self.update_units_combos()
+                    # Zaktualizuj wybór w combobox
+                    if self.current_unit_side == "własne":
+                        self.own_units_var.set(new_name)
+                    else:
+                        self.enemy_units_var.set(new_name)
+                    # Zaktualizuj tytuł
+                    self.unit_details_frame.config(text=f"Szczegóły: {new_name} ({self.current_unit_side})")
+            
+            # Liczba ludzi (max 150)
+            people = int(self.unit_people_var.get() or 0)
+            people = max(0, min(150, people))
+            unit_data["liczba_ludzi"] = people
+            self.unit_people_var.set(str(people))
+            
+            # Doświadczenie
+            exp = int(self.unit_exp_var.get() or 0)
+            unit_data["doświadczenie"] = exp
+            
+            # Zapasy (max 3)
+            supplies = int(self.unit_supplies_var.get() or 0)
+            supplies = max(0, min(3, supplies))
+            unit_data["zapasy"] = supplies
+            self.unit_supplies_var.set(str(supplies))
+            
+            # Zwycięstwa
+            victories = int(self.unit_victories_var.get() or 0)
+            victories = max(0, victories)
+            unit_data["liczba_zwycięstw"] = victories
+            
+            # Uzupełnienia
+            reinforcements = int(self.unit_reinforcements_var.get() or 0)
+            reinforcements = max(0, reinforcements)
+            unit_data["liczba_uzupełnień"] = reinforcements
+            
+        except ValueError:
+            # Ignoruj błędy konwersji podczas wpisywania
+            pass
+    
+    def export_unit_data(self):
+        """Eksportuje dane jednostki w określonym formacie"""
+        if not self.current_unit or self.current_unit_side not in self.units:
+            return
+        
+        if self.current_unit not in self.units[self.current_unit_side]:
+            return
+        
+        unit_data = self.units[self.current_unit_side][self.current_unit]
+        
+        # Format doświadczenia
+        exp = unit_data["doświadczenie"]
+        exp_text = ""
+        if exp > 0:
+            exp_text = "+" * exp
+        elif exp == -1:
+            exp_text = "-"
+        elif exp == -2:
+            exp_text = "--"
+        elif exp < -2:
+            exp_text = "-" * abs(exp)
+        # Dla exp == 0 nie dodawać nic
+        
+        # Formatting zgodnie z wymaganiami
+        export_text = f"Doświadczenie = {exp_text} W{unit_data['liczba_zwycięstw']} U{unit_data['liczba_uzupełnień']}\n"
+        export_text += f"Ludzie = {unit_data['liczba_ludzi']}/150\n"
+        export_text += f"Zapasy = {unit_data['zapasy']}/3"
+        
+        # Skopiuj do schowka (prostym sposobem - pokaż w oknie do kopiowania)
+        export_window = tk.Toplevel(self.root)
+        export_window.title(f"Eksport: {self.current_unit}")
+        export_window.geometry("400x200")
+        export_window.resizable(False, False)
+        
+        ttk.Label(export_window, text="Skopiuj poniższe dane:", font=("Arial", 10, "bold")).pack(pady=(10, 5))
+        
+        text_widget = tk.Text(export_window, height=6, width=40, font=("Arial", 10))
+        text_widget.pack(pady=(5, 10), padx=10, fill=tk.BOTH, expand=True)
+        text_widget.insert(tk.END, export_text)
+        text_widget.config(state=tk.DISABLED)
+        
+        # Przycisk zamknij
+        ttk.Button(export_window, text="Zamknij", command=export_window.destroy).pack(pady=(0, 10))
+        
+        # Zaznacz wszystko w text widget
+        text_widget.config(state=tk.NORMAL)
+        text_widget.tag_add(tk.SEL, "1.0", tk.END)
+        text_widget.mark_set(tk.INSERT, "1.0")
+        text_widget.focus()
 
 
 def main():
