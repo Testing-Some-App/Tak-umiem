@@ -586,9 +586,6 @@ class DiceRollerApp:
         dice1_exp_range_bonus = dice1_exp * 2  # +2 do oczek za każdy poziom
         dice2_exp_range_bonus = dice2_exp * 2
         
-        dice1_exp_modifier_bonus = dice1_exp  # +1 do modyfikatora za każdy poziom
-        dice2_exp_modifier_bonus = dice2_exp
-        
         # Losowanie wartości dla obu kości z uwzględnieniem modyfikatora zakresu i bonusów doświadczenia
         dice1_max = 4 + self.dice1_range_modifier + dice1_exp_range_bonus
         dice2_max = 4 + self.dice2_range_modifier + dice2_exp_range_bonus
@@ -606,9 +603,9 @@ class DiceRollerApp:
         if self.dice2_surrounded_var.get():
             dice2_total_modifier -= 1
         
-        # Dodawanie modyfikatorów doświadczenia (włączając bonusy pozytywnego doświadczenia i przewagę liczebna)
-        dice1_total_modifier += self.dice1_exp_var.get() + dice1_exp_modifier_bonus + numerical_advantage_1
-        dice2_total_modifier += self.dice2_exp_var.get() + dice2_exp_modifier_bonus + numerical_advantage_2
+        # Dodawanie modyfikatorów doświadczenia i przewagi liczebnej
+        dice1_total_modifier += self.dice1_exp_var.get() + numerical_advantage_1
+        dice2_total_modifier += self.dice2_exp_var.get() + numerical_advantage_2
         
         # Dodawanie innych modyfikatorów
         if self.dice1_defense_var.get():
@@ -642,9 +639,15 @@ class DiceRollerApp:
         # Obliczanie wyników bitwy
         self.calculate_battle_results(dice1_final, dice2_final)
         
-        # Aktualizacja wyników liczby ludzi ze stratami
+        # Aktualizacja wyników liczby ludzi ze stratami i przewagą liczebną
         dice1_text = f"Wynik: {self.dice1_people_result} ludzi\nStraty: {getattr(self, 'dice1_losses', 0)}"
         dice2_text = f"Wynik: {self.dice2_people_result} ludzi\nStraty: {getattr(self, 'dice2_losses', 0)}"
+        
+        # Dodanie informacji o przewadze liczebnej pod stratami
+        if numerical_advantage_1 > 0:
+            dice1_text += f"\nPrzewaga: +{numerical_advantage_1}"
+        if numerical_advantage_2 > 0:
+            dice2_text += f"\nPrzewaga: +{numerical_advantage_2}"
         
         self.dice1_people_result_label.config(text=dice1_text)
         self.dice2_people_result_label.config(text=dice2_text)
