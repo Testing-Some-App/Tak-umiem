@@ -215,9 +215,17 @@ class DiceRollerApp:
         
         self.new_unit_name_var = tk.StringVar()
         self.new_unit_name_entry = ttk.Entry(create_unit_frame, textvariable=self.new_unit_name_var, width=15)
-        self.new_unit_name_entry.grid(row=1, column=0, sticky=tk.W+tk.E, pady=(5, 5))
+        self.new_unit_name_entry.grid(row=1, column=0, sticky=tk.W+tk.E, pady=(5, 0))
         
-        ttk.Button(create_unit_frame, text="Stwórz", command=self.create_new_unit).grid(row=1, column=1, padx=(5, 0), pady=(5, 5))
+        # Przyciski wyboru strony dla nowej jednostki
+        create_buttons_frame = ttk.Frame(create_unit_frame)
+        create_buttons_frame.grid(row=2, column=0, columnspan=2, pady=(5, 0))
+        
+        self.new_unit_side_var = tk.StringVar(value="własne")
+        ttk.Radiobutton(create_buttons_frame, text="Swoje", variable=self.new_unit_side_var, value="własne").grid(row=0, column=0, padx=(0, 10))
+        ttk.Radiobutton(create_buttons_frame, text="Wróg", variable=self.new_unit_side_var, value="wroga").grid(row=0, column=1, padx=(10, 0))
+        
+        ttk.Button(create_unit_frame, text="Stwórz", command=self.create_new_unit).grid(row=3, column=0, columnspan=2, pady=(5, 0))
         
         # Frame dla szczegółów jednostki (początkowo ukryty)
         self.unit_details_frame = ttk.LabelFrame(units_frame, text="Szczegóły jednostki", padding="10")
@@ -1062,7 +1070,9 @@ class DiceRollerApp:
             'people2_before': self.dice2_people_original,
             'people2_after': self.dice2_people_result,
             'exp1': self.dice1_gets_exp,
-            'exp2': self.dice2_gets_exp
+            'exp2': self.dice2_gets_exp,
+            'unit1_name': self.selected_unit_side1 if self.unit_side1_type != "brak" else None,
+            'unit2_name': self.selected_unit_side2 if self.unit_side2_type != "brak" else None
         }
         
         # Dodanie do listy historii
@@ -1092,7 +1102,11 @@ class DiceRollerApp:
             exp1_icon = " ⭐" if entry['exp1'] else ""
             exp2_icon = " ⭐" if entry['exp2'] else ""
             
-            history_line = f"#{i}: Strona 1: {entry['dice1']}{exp1_icon} | Strona 2: {entry['dice2']}{exp2_icon}\n"
+            # Nazwy jednostek w historii
+            unit1_info = f" ({entry.get('unit1_name', '')})" if entry.get('unit1_name') else ""
+            unit2_info = f" ({entry.get('unit2_name', '')})" if entry.get('unit2_name') else ""
+            
+            history_line = f"#{i}: Strona 1: {entry['dice1']}{exp1_icon}{unit1_info} | Strona 2: {entry['dice2']}{exp2_icon}{unit2_info}\n"
             history_line += f"    Ludzie: {entry['people1_before']}→{entry['people1_after']} | {entry['people2_before']}→{entry['people2_after']}\n\n"
             
             self.history_text.insert(tk.END, history_line)
@@ -1218,7 +1232,11 @@ class DiceRollerApp:
             exp1_icon = " ⭐" if entry['exp1'] else ""
             exp2_icon = " ⭐" if entry['exp2'] else ""
             
-            history_line = f"#{i}: Strona 1: {entry['dice1']}{exp1_icon} | Strona 2: {entry['dice2']}{exp2_icon}\n"
+            # Nazwy jednostek w historii bitwy (dla starszych zapisów może nie być)
+            unit1_info = f" ({entry.get('unit1_name', '')})" if entry.get('unit1_name') else ""
+            unit2_info = f" ({entry.get('unit2_name', '')})" if entry.get('unit2_name') else ""
+            
+            history_line = f"#{i}: Strona 1: {entry['dice1']}{exp1_icon}{unit1_info} | Strona 2: {entry['dice2']}{exp2_icon}{unit2_info}\n"
             history_line += f"    Ludzie: {entry['people1_before']}→{entry['people1_after']} | {entry['people2_before']}→{entry['people2_after']}\n\n"
             
             self.battle_history_text.insert(tk.END, history_line)
@@ -1357,8 +1375,8 @@ class DiceRollerApp:
             messagebox.showwarning("Błąd", "Jednostka o tej nazwie już istnieje!")
             return
         
-        # Domyślnie tworzymy jako własną jednostkę
-        side = "własne"
+        # Pobranie wybranej strony z przycisków radio
+        side = self.new_unit_side_var.get()
         
         # Tworzenie nowej jednostki z domyślnymi wartościami
         unit_data = {
@@ -1368,7 +1386,7 @@ class DiceRollerApp:
             "zapasy": 3,
             "liczba_zwycięstw": 0,
             "liczba_uzupełnień": 0,
-            "strona": "własne"  # Dodane pole strony
+            "strona": side  # Pole strony według wyboru
         }
         
         # Dodanie jednostki
@@ -1380,15 +1398,19 @@ class DiceRollerApp:
         # Automatyczne wybranie utworzonej jednostki
         self.current_unit = unit_name
         self.current_unit_side = side
-        self.own_units_var.set(unit_name)
-        self.enemy_units_var.set("")
+        if side == "własne":
+            self.own_units_var.set(unit_name)
+            self.enemy_units_var.set("")
+        else:
+            self.enemy_units_var.set(unit_name)
+            self.own_units_var.set("")
         
         self.show_unit_details()
         
         # Wyczyszczenie pola nazwy
         self.new_unit_name_var.set("")
         
-        messagebox.showinfo("Sukces", f"Utworzono jednostkę: {unit_name}")
+        messagebox.showinfo("Sukces", f"Utworzono jednostkę: {unit_name} ({side})")
     
     def on_unit_selected(self, side):
         """Obsługuje wybór jednostki"""
@@ -1442,14 +1464,6 @@ class DiceRollerApp:
         self.unit_name_entry.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 5))
         self.unit_name_entry.bind('<KeyRelease>', self.on_unit_data_change)
         
-        # Strona jednostki
-        row += 1
-        ttk.Label(self.unit_details_frame, text="Strona:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-        self.unit_side_var = tk.StringVar(value=unit_data.get("strona", self.current_unit_side))
-        unit_side_combo = ttk.Combobox(self.unit_details_frame, textvariable=self.unit_side_var, 
-                                      values=["własne", "wroga"], state="readonly", width=10)
-        unit_side_combo.grid(row=row, column=1, sticky=tk.W, padx=(0, 5), pady=(5, 0))
-        unit_side_combo.bind("<<ComboboxSelected>>", self.on_unit_side_change)
         
         # Liczba ludzi (format X/150)
         row += 1
@@ -1499,9 +1513,18 @@ class DiceRollerApp:
         self.unit_reinforcements_entry.grid(row=row, column=1, sticky=tk.W, padx=(0, 5), pady=(5, 0))
         self.unit_reinforcements_entry.bind('<KeyRelease>', self.on_unit_data_change)
         
+        # Przyciski wyboru strony na dole
+        row += 1
+        side_buttons_frame = ttk.Frame(self.unit_details_frame)
+        side_buttons_frame.grid(row=row, column=0, columnspan=2, pady=(10, 5))
+        
+        self.unit_side_var = tk.StringVar(value=unit_data.get("strona", self.current_unit_side))
+        ttk.Radiobutton(side_buttons_frame, text="Swoje", variable=self.unit_side_var, value="własne", command=self.on_unit_side_change).grid(row=0, column=0, padx=(0, 10))
+        ttk.Radiobutton(side_buttons_frame, text="Wróg", variable=self.unit_side_var, value="wroga", command=self.on_unit_side_change).grid(row=0, column=1, padx=(10, 0))
+        
         # Przycisk eksportu
         row += 1
-        ttk.Button(self.unit_details_frame, text="Eksportuj dane", command=self.export_unit_data).grid(row=row, column=0, columnspan=2, pady=(10, 0))
+        ttk.Button(self.unit_details_frame, text="Eksportuj dane", command=self.export_unit_data).grid(row=row, column=0, columnspan=2, pady=(5, 0))
     
     def hide_unit_details(self):
         """Ukrywa szczegóły jednostki"""
@@ -1656,12 +1679,7 @@ class DiceRollerApp:
         self.unit_side1_type = unit_type1
         self.unit_side2_type = unit_type2
         
-        # Wyczyść pola doświadczenia i liczby ludzi
-        self.dice1_exp_var.set(0)
-        self.dice2_exp_var.set(0)
-        self.dice1_people_var.set("0")
-        self.dice2_people_var.set("0")
-        self.update_exp_bonuses_display()
+        # NIE resetuj pól doświadczenia i liczby ludzi - tylko gdy wybierze się konkretną jednostkę
     
     def on_battle_unit_selected(self, event=None):
         """Obsługuje wybór konkretnej jednostki do bitwy"""
