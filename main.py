@@ -86,8 +86,8 @@ class DiceRollerApp:
         main_frame.grid(row=0, column=0, columnspan=2, sticky=tk.W+tk.E+tk.N+tk.S)
         
         # Frame po lewej stronie (główna gra)
-        game_frame = ttk.Frame(main_frame)
-        game_frame.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S, padx=(0, 10))
+        self.game_frame = ttk.Frame(main_frame)
+        self.game_frame.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S, padx=(0, 10))
         
         # Frame po prawej stronie (historia)
         history_frame = ttk.LabelFrame(main_frame, text="Historia ostatnich 12 rzutów", padding="10")
@@ -134,14 +134,14 @@ class DiceRollerApp:
         
         # Tytuł aplikacji
         title_label = ttk.Label(
-            game_frame, 
+            self.game_frame, 
             text="Rzut dwoma 4-ściennymi kośćmi", 
             font=("Arial", 16, "bold")
         )
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
         
         # Frame dla ustawień atak/obrona/w ruchu
-        combat_mode_frame = ttk.LabelFrame(game_frame, text="Rodzaj działania", padding="10")
+        combat_mode_frame = ttk.LabelFrame(self.game_frame, text="Rodzaj działania", padding="10")
         combat_mode_frame.grid(row=1, column=0, columnspan=3, pady=(0, 10))
         
         # Strona 1 - opcje
@@ -183,7 +183,7 @@ class DiceRollerApp:
         separator_combat.grid(row=0, column=1, sticky=tk.N+tk.S, padx=20)
         
         # Frame dla wyników kości (horizontal layout)
-        dice_frame = ttk.LabelFrame(game_frame, text="Wyniki", padding="15")
+        dice_frame = ttk.LabelFrame(self.game_frame, text="Wyniki", padding="15")
         dice_frame.grid(row=2, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 20))
         
         # Pierwsza strona - liczba ludzi i nazwa
@@ -264,7 +264,7 @@ class DiceRollerApp:
         
         # Wynik taktyczny (nad przyciskiem)
         self.tactical_result_label = ttk.Label(
-            game_frame,
+            self.game_frame,
             text="",
             font=("Arial", 12, "bold"),
             foreground="darkgreen"
@@ -273,7 +273,7 @@ class DiceRollerApp:
         
         # Przycisk do generowania wyniku
         self.roll_button = ttk.Button(
-            game_frame,
+            self.game_frame,
             text="Wynik",
             command=self.roll_dice,
             style="Roll.TButton"
@@ -286,7 +286,7 @@ class DiceRollerApp:
         style.configure("Reset.TButton", font=("Arial", 10))
         
         # Frame dla modyfikatorów
-        modifiers_frame = ttk.LabelFrame(game_frame, text="Modyfikatory", padding="10")
+        modifiers_frame = ttk.LabelFrame(self.game_frame, text="Modyfikatory", padding="10")
         modifiers_frame.grid(row=5, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(10, 0))
         
         # Przycisk Reset na górze modyfikatorów
@@ -307,42 +307,46 @@ class DiceRollerApp:
         self.dice1_modifier_var = tk.StringVar(value="0")
         self.dice1_modifier_entry = ttk.Entry(left_frame, textvariable=self.dice1_modifier_var, width=5, font=("Arial", 10))
         self.dice1_modifier_entry.grid(row=0, column=1, padx=(0, 5))
+        # Label dla bonusu doświadczenia do dodatku
+        self.dice1_modifier_bonus_label = ttk.Label(left_frame, text="", font=("Arial", 9), foreground="green")
+        self.dice1_modifier_bonus_label.grid(row=0, column=2, padx=(5, 0))
         
         # Modyfikator zakresu strony 1
         ttk.Label(left_frame, text="Oczka +:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
         self.dice1_range_var = tk.StringVar(value="0")
         self.dice1_range_entry = ttk.Entry(left_frame, textvariable=self.dice1_range_var, width=5, font=("Arial", 10))
         self.dice1_range_entry.grid(row=1, column=1, padx=(0, 5), pady=(5, 0))
+        # Label dla bonusu doświadczenia do oczek
+        self.dice1_range_bonus_label = ttk.Label(left_frame, text="", font=("Arial", 9), foreground="green")
+        self.dice1_range_bonus_label.grid(row=1, column=2, padx=(5, 0))
         
         # Otoczony strona 1
         self.dice1_surrounded_var = tk.BooleanVar()
         self.dice1_surrounded_check = ttk.Checkbutton(left_frame, text="Otoczony (-1)", variable=self.dice1_surrounded_var, onvalue=True, offvalue=False)
         self.dice1_surrounded_check.grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
         
-        # Doświadczenie strona 1 (tylko jeden może być wybrany)
-        ttk.Label(left_frame, text="Doświadczenie:", font=("Arial", 10, "bold")).grid(row=3, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
-        
+        # Doświadczenie strona 1 (dropdown jak fortyfikacje)
+        ttk.Label(left_frame, text="Doświadczenie:", font=("Arial", 10)).grid(row=3, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
         self.dice1_exp_var = tk.IntVar(value=0)
-        exp_values = [-2, -1, 0, 1, 2, 3, 4, 5, 6]
-        for i, exp_val in enumerate(exp_values):
-            exp_radio = ttk.Radiobutton(left_frame, text=f"Doświadczenie {exp_val:+d}", variable=self.dice1_exp_var, value=exp_val)
-            exp_radio.grid(row=4 + i//3, column=i%3, sticky=tk.W, pady=(2, 0), padx=(0, 5))
+        exp_combo1 = ttk.Combobox(left_frame, textvariable=self.dice1_exp_var, values=["-2", "-1", "0", "1", "2", "3", "4", "5", "6"], width=3, state="readonly")
+        exp_combo1.grid(row=3, column=1, padx=(0, 5), pady=(5, 0))
+        exp_combo1.bind("<<ComboboxSelected>>", self.update_exp_bonuses_display)
         
         # Dodatkowe modyfikatory strona 1
-        ttk.Label(left_frame, text="Dodatkowe:", font=("Arial", 10, "bold")).grid(row=7, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
+        ttk.Label(left_frame, text="Dodatkowe:", font=("Arial", 10, "bold")).grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
         
         self.dice1_defense_var = tk.BooleanVar()
         self.dice1_defense_check = ttk.Checkbutton(left_frame, text="Obrona w zabudowaniach (+1)", variable=self.dice1_defense_var)
-        self.dice1_defense_check.grid(row=8, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
+        self.dice1_defense_check.grid(row=5, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
         
         self.dice1_supply_var = tk.BooleanVar()
         self.dice1_supply_check = ttk.Checkbutton(left_frame, text="Brak zaopatrzenia (-1)", variable=self.dice1_supply_var)
-        self.dice1_supply_check.grid(row=9, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
+        self.dice1_supply_check.grid(row=6, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
         
-        ttk.Label(left_frame, text="Fortyfikacje:", font=("Arial", 10)).grid(row=10, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        ttk.Label(left_frame, text="Fortyfikacje:", font=("Arial", 10)).grid(row=7, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
         self.dice1_fort_var = tk.IntVar(value=0)
         fort_combo1 = ttk.Combobox(left_frame, textvariable=self.dice1_fort_var, values=["0", "1", "2", "3"], width=3, state="readonly")
-        fort_combo1.grid(row=10, column=1, padx=(0, 5), pady=(5, 0))
+        fort_combo1.grid(row=7, column=1, padx=(0, 5), pady=(5, 0))
         
         # Prawa kolumna - Strona 2
         right_frame = ttk.LabelFrame(modifiers_frame, text="Strona 2", padding="10")
@@ -353,45 +357,50 @@ class DiceRollerApp:
         self.dice2_modifier_var = tk.StringVar(value="0")
         self.dice2_modifier_entry = ttk.Entry(right_frame, textvariable=self.dice2_modifier_var, width=5, font=("Arial", 10))
         self.dice2_modifier_entry.grid(row=0, column=1, padx=(0, 5))
+        # Label dla bonusu doświadczenia do dodatku
+        self.dice2_modifier_bonus_label = ttk.Label(right_frame, text="", font=("Arial", 9), foreground="green")
+        self.dice2_modifier_bonus_label.grid(row=0, column=2, padx=(5, 0))
         
         # Modyfikator zakresu strony 2
         ttk.Label(right_frame, text="Oczka +:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
         self.dice2_range_var = tk.StringVar(value="0")
         self.dice2_range_entry = ttk.Entry(right_frame, textvariable=self.dice2_range_var, width=5, font=("Arial", 10))
         self.dice2_range_entry.grid(row=1, column=1, padx=(0, 5), pady=(5, 0))
+        # Label dla bonusu doświadczenia do oczek
+        self.dice2_range_bonus_label = ttk.Label(right_frame, text="", font=("Arial", 9), foreground="green")
+        self.dice2_range_bonus_label.grid(row=1, column=2, padx=(5, 0))
         
         # Otoczony strona 2
         self.dice2_surrounded_var = tk.BooleanVar()
         self.dice2_surrounded_check = ttk.Checkbutton(right_frame, text="Otoczony (-1)", variable=self.dice2_surrounded_var, onvalue=True, offvalue=False)
         self.dice2_surrounded_check.grid(row=2, column=0, columnspan=2, sticky=tk.W, pady=(5, 0))
         
-        # Doświadczenie strona 2 (tylko jeden może być wybrany)
-        ttk.Label(right_frame, text="Doświadczenie:", font=("Arial", 10, "bold")).grid(row=3, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
-        
+        # Doświadczenie strona 2 (dropdown jak fortyfikacje)
+        ttk.Label(right_frame, text="Doświadczenie:", font=("Arial", 10)).grid(row=3, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
         self.dice2_exp_var = tk.IntVar(value=0)
-        for i, exp_val in enumerate(exp_values):
-            exp_radio = ttk.Radiobutton(right_frame, text=f"Doświadczenie {exp_val:+d}", variable=self.dice2_exp_var, value=exp_val)
-            exp_radio.grid(row=4 + i//3, column=i%3, sticky=tk.W, pady=(2, 0), padx=(0, 5))
+        exp_combo2 = ttk.Combobox(right_frame, textvariable=self.dice2_exp_var, values=["-2", "-1", "0", "1", "2", "3", "4", "5", "6"], width=3, state="readonly")
+        exp_combo2.grid(row=3, column=1, padx=(0, 5), pady=(5, 0))
+        exp_combo2.bind("<<ComboboxSelected>>", self.update_exp_bonuses_display)
         
         # Dodatkowe modyfikatory strona 2
-        ttk.Label(right_frame, text="Dodatkowe:", font=("Arial", 10, "bold")).grid(row=7, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
+        ttk.Label(right_frame, text="Dodatkowe:", font=("Arial", 10, "bold")).grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=(10, 5))
         
         self.dice2_defense_var = tk.BooleanVar()
         self.dice2_defense_check = ttk.Checkbutton(right_frame, text="Obrona w zabudowaniach (+1)", variable=self.dice2_defense_var)
-        self.dice2_defense_check.grid(row=8, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
+        self.dice2_defense_check.grid(row=5, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
         
         self.dice2_supply_var = tk.BooleanVar()
         self.dice2_supply_check = ttk.Checkbutton(right_frame, text="Brak zaopatrzenia (-1)", variable=self.dice2_supply_var)
-        self.dice2_supply_check.grid(row=9, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
+        self.dice2_supply_check.grid(row=6, column=0, columnspan=3, sticky=tk.W, pady=(2, 0))
         
-        ttk.Label(right_frame, text="Fortyfikacje:", font=("Arial", 10)).grid(row=10, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        ttk.Label(right_frame, text="Fortyfikacje:", font=("Arial", 10)).grid(row=7, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
         self.dice2_fort_var = tk.IntVar(value=0)
         fort_combo2 = ttk.Combobox(right_frame, textvariable=self.dice2_fort_var, values=["0", "1", "2", "3"], width=3, state="readonly")
-        fort_combo2.grid(row=10, column=1, padx=(0, 5), pady=(5, 0))
+        fort_combo2.grid(row=7, column=1, padx=(0, 5), pady=(5, 0))
         
         # Informacja o zakresie wartości
         info_label = ttk.Label(
-            game_frame,
+            self.game_frame,
             text="Każda strona: 1 do (4 + oczka) + modyfikatory",
             font=("Arial", 10),
             foreground="gray"
@@ -401,9 +410,9 @@ class DiceRollerApp:
         # Konfiguracja rozciągania kolumn
         main_frame.columnconfigure(0, weight=2)  # Gra
         main_frame.columnconfigure(1, weight=1)  # Historia
-        game_frame.columnconfigure(0, weight=1)
-        game_frame.columnconfigure(1, weight=1)
-        game_frame.columnconfigure(2, weight=1)
+        self.game_frame.columnconfigure(0, weight=1)
+        self.game_frame.columnconfigure(1, weight=1)
+        self.game_frame.columnconfigure(2, weight=1)
         dice_frame.columnconfigure(0, weight=1)
         dice_frame.columnconfigure(2, weight=1)
         combat_mode_frame.columnconfigure(0, weight=1)
@@ -439,6 +448,9 @@ class DiceRollerApp:
         self.dice2_defense_var.set(False)
         self.dice2_supply_var.set(False)
         self.dice2_fort_var.set(0)
+        
+        # Aktualizacja wyświetlania bonusów doświadczenia
+        self.update_exp_bonuses_display()
     
     def on_side1_attack_change(self):
         """Obsługuje zmianę ataku strony 1"""
@@ -490,6 +502,26 @@ class DiceRollerApp:
             self.side2_defense_var.set(False)
             # Nie wyłączamy W ruchu dla strony 1 - może być niezależnie
     
+    def update_exp_bonuses_display(self, event=None):
+        """Aktualizuje wyświetlanie bonusów doświadczenia obok pól wejściowych"""
+        # Strona 1
+        exp1 = self.dice1_exp_var.get() if self.dice1_exp_var.get() > 0 else 0
+        if exp1 > 0:
+            self.dice1_modifier_bonus_label.config(text=f"(+{exp1})")
+            self.dice1_range_bonus_label.config(text=f"(+{exp1 * 2})")
+        else:
+            self.dice1_modifier_bonus_label.config(text="")
+            self.dice1_range_bonus_label.config(text="")
+        
+        # Strona 2
+        exp2 = self.dice2_exp_var.get() if self.dice2_exp_var.get() > 0 else 0
+        if exp2 > 0:
+            self.dice2_modifier_bonus_label.config(text=f"(+{exp2})")
+            self.dice2_range_bonus_label.config(text=f"(+{exp2 * 2})")
+        else:
+            self.dice2_modifier_bonus_label.config(text="")
+            self.dice2_range_bonus_label.config(text="")
+    
     def roll_dice(self):
         """Rzuca dwiema 4-ściennymi kośćmi i aktualizuje wyniki"""
         # Pobieranie podstawowych modyfikatorów
@@ -531,9 +563,35 @@ class DiceRollerApp:
             self.dice2_people_original = 0
             self.dice2_people_var.set("0")
         
-        # Losowanie wartości dla obu kości z uwzględnieniem modyfikatora zakresu
-        dice1_max = 4 + self.dice1_range_modifier
-        dice2_max = 4 + self.dice2_range_modifier
+        # Obliczanie przewagi liczebnej (2.1x = +1, 4.2x = +2, itd.)
+        numerical_advantage_1 = 0
+        numerical_advantage_2 = 0
+        self.numerical_advantage_message = ""
+        
+        if self.dice1_people_original > 0 and self.dice2_people_original > 0:
+            ratio_1_vs_2 = self.dice1_people_original / self.dice2_people_original
+            ratio_2_vs_1 = self.dice2_people_original / self.dice1_people_original
+            
+            if ratio_1_vs_2 >= 2.1:
+                numerical_advantage_1 = int(ratio_1_vs_2 / 2.1)
+                self.numerical_advantage_message = f"Przewaga liczebna Strony 1: +{numerical_advantage_1}"
+            elif ratio_2_vs_1 >= 2.1:
+                numerical_advantage_2 = int(ratio_2_vs_1 / 2.1)
+                self.numerical_advantage_message = f"Przewaga liczebna Strony 2: +{numerical_advantage_2}"
+        
+        # Dodanie bonusów doświadczenia do zakresu i modyfikatora
+        dice1_exp = self.dice1_exp_var.get() if self.dice1_exp_var.get() > 0 else 0
+        dice2_exp = self.dice2_exp_var.get() if self.dice2_exp_var.get() > 0 else 0
+        
+        dice1_exp_range_bonus = dice1_exp * 2  # +2 do oczek za każdy poziom
+        dice2_exp_range_bonus = dice2_exp * 2
+        
+        dice1_exp_modifier_bonus = dice1_exp  # +1 do modyfikatora za każdy poziom
+        dice2_exp_modifier_bonus = dice2_exp
+        
+        # Losowanie wartości dla obu kości z uwzględnieniem modyfikatora zakresu i bonusów doświadczenia
+        dice1_max = 4 + self.dice1_range_modifier + dice1_exp_range_bonus
+        dice2_max = 4 + self.dice2_range_modifier + dice2_exp_range_bonus
         
         self.dice1_value = random.randint(1, max(1, dice1_max))
         self.dice2_value = random.randint(1, max(1, dice2_max))
@@ -548,9 +606,9 @@ class DiceRollerApp:
         if self.dice2_surrounded_var.get():
             dice2_total_modifier -= 1
         
-        # Dodawanie modyfikatorów doświadczenia (tylko jeden może być wybrany)
-        dice1_total_modifier += self.dice1_exp_var.get()
-        dice2_total_modifier += self.dice2_exp_var.get()
+        # Dodawanie modyfikatorów doświadczenia (włączając bonusy pozytywnego doświadczenia i przewagę liczebna)
+        dice1_total_modifier += self.dice1_exp_var.get() + dice1_exp_modifier_bonus + numerical_advantage_1
+        dice2_total_modifier += self.dice2_exp_var.get() + dice2_exp_modifier_bonus + numerical_advantage_2
         
         # Dodawanie innych modyfikatorów
         if self.dice1_defense_var.get():
@@ -590,6 +648,23 @@ class DiceRollerApp:
         
         self.dice1_people_result_label.config(text=dice1_text)
         self.dice2_people_result_label.config(text=dice2_text)
+        
+        # Wyświetlenie informacji o przewadze liczebnej
+        advantage_message = getattr(self, 'numerical_advantage_message', '')
+        if advantage_message:
+            if not hasattr(self, 'advantage_label'):
+                # Tworzenie labela dla przewagi liczebnej jeśli nie istnieje
+                self.advantage_label = ttk.Label(
+                    self.game_frame, 
+                    text="", 
+                    font=("Arial", 10, "bold"), 
+                    foreground="purple"
+                )
+                self.advantage_label.grid(row=3, column=0, columnspan=3, pady=(5, 0))
+            self.advantage_label.config(text=advantage_message)
+        else:
+            if hasattr(self, 'advantage_label'):
+                self.advantage_label.config(text="")
         
         # Aktualizacja ikon doświadczenia
         self.dice1_exp_icon.config(text="⭐ Doświadczenie +" if self.dice1_gets_exp else "")
