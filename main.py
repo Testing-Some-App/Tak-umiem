@@ -126,15 +126,15 @@ class DiceRollerApp:
         ttk.Label(side1_frame, text="Strona 1:", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, sticky=tk.W)
         
         self.side1_attack_var = tk.BooleanVar(value=True)
-        self.side1_attack_check = ttk.Checkbutton(side1_frame, text="Atak", variable=self.side1_attack_var, command=self.on_attack_defense_change)
+        self.side1_attack_check = ttk.Checkbutton(side1_frame, text="Atak", variable=self.side1_attack_var, command=self.on_side1_attack_change)
         self.side1_attack_check.grid(row=1, column=0, sticky=tk.W, padx=(0, 10))
         
         self.side1_defense_var = tk.BooleanVar(value=False)
-        self.side1_defense_check = ttk.Checkbutton(side1_frame, text="Obrona", variable=self.side1_defense_var, command=self.on_attack_defense_change)
+        self.side1_defense_check = ttk.Checkbutton(side1_frame, text="Obrona", variable=self.side1_defense_var, command=self.on_side1_defense_change)
         self.side1_defense_check.grid(row=1, column=1, sticky=tk.W, padx=(0, 10))
         
         self.side1_motion_var = tk.BooleanVar(value=False)
-        self.side1_motion_check = ttk.Checkbutton(side1_frame, text="W ruchu", variable=self.side1_motion_var, command=self.on_attack_defense_change)
+        self.side1_motion_check = ttk.Checkbutton(side1_frame, text="W ruchu", variable=self.side1_motion_var, command=self.on_side1_motion_change)
         self.side1_motion_check.grid(row=1, column=2, sticky=tk.W)
         
         # Strona 2 - opcje
@@ -143,15 +143,15 @@ class DiceRollerApp:
         ttk.Label(side2_frame, text="Strona 2:", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, sticky=tk.W)
         
         self.side2_attack_var = tk.BooleanVar(value=False)
-        self.side2_attack_check = ttk.Checkbutton(side2_frame, text="Atak", variable=self.side2_attack_var, command=self.on_attack_defense_change)
+        self.side2_attack_check = ttk.Checkbutton(side2_frame, text="Atak", variable=self.side2_attack_var, command=self.on_side2_attack_change)
         self.side2_attack_check.grid(row=1, column=0, sticky=tk.W, padx=(0, 10))
         
         self.side2_defense_var = tk.BooleanVar(value=True)
-        self.side2_defense_check = ttk.Checkbutton(side2_frame, text="Obrona", variable=self.side2_defense_var, command=self.on_attack_defense_change)
+        self.side2_defense_check = ttk.Checkbutton(side2_frame, text="Obrona", variable=self.side2_defense_var, command=self.on_side2_defense_change)
         self.side2_defense_check.grid(row=1, column=1, sticky=tk.W, padx=(0, 10))
         
         self.side2_motion_var = tk.BooleanVar(value=False)
-        self.side2_motion_check = ttk.Checkbutton(side2_frame, text="W ruchu", variable=self.side2_motion_var, command=self.on_attack_defense_change)
+        self.side2_motion_check = ttk.Checkbutton(side2_frame, text="W ruchu", variable=self.side2_motion_var, command=self.on_side2_motion_change)
         self.side2_motion_check.grid(row=1, column=2, sticky=tk.W)
         
         # Separator pionowy
@@ -383,68 +383,59 @@ class DiceRollerApp:
         # Bind Enter key to roll dice
         self.root.bind('<Return>', lambda event: self.roll_dice())
     
-    def on_attack_defense_change(self):
-        """Zapewnia, że tylko jedna opcja może być wybrana globalnie"""
-        # Tymczasowo usuwamy bindowanie, żeby uniknąć rekurencji
-        self.side1_attack_check.configure(command=None)
-        self.side1_defense_check.configure(command=None)
-        self.side2_attack_check.configure(command=None)
-        self.side2_defense_check.configure(command=None)
-        self.side1_motion_check.configure(command=None)
-        self.side2_motion_check.configure(command=None)
-        
-        # Sprawdzanie która opcja została zaznaczona
+    def on_side1_attack_change(self):
+        """Obsługuje zmianę ataku strony 1"""
         if self.side1_attack_var.get():
-            # Wyłącz wszystko inne
             self.side1_defense_var.set(False)
             self.side1_motion_var.set(False)
             self.side2_attack_var.set(False)
-            self.side2_defense_var.set(True)  # Automatycznie ustaw obronę dla strony 2
-            self.side2_motion_var.set(False)
-        elif self.side1_defense_var.get():
-            self.side1_attack_var.set(False)
-            self.side1_motion_var.set(False)
-            self.side2_attack_var.set(True)  # Automatycznie ustaw atak dla strony 2
-            self.side2_defense_var.set(False)
-            self.side2_motion_var.set(False)
-        elif self.side1_motion_var.get():
-            self.side1_attack_var.set(False)
-            self.side1_defense_var.set(False)
-            self.side2_attack_var.set(False)
-            self.side2_defense_var.set(False)
-            self.side2_motion_var.set(False)
-        elif self.side2_attack_var.get():
-            self.side2_defense_var.set(False)
-            self.side2_motion_var.set(False)
-            self.side1_attack_var.set(False)
-            self.side1_defense_var.set(True)  # Automatycznie ustaw obronę dla strony 1
-            self.side1_motion_var.set(False)
-        elif self.side2_defense_var.get():
-            self.side2_attack_var.set(False)
-            self.side2_motion_var.set(False)
-            self.side1_attack_var.set(True)  # Automatycznie ustaw atak dla strony 1
-            self.side1_defense_var.set(False)
-            self.side1_motion_var.set(False)
-        elif self.side2_motion_var.get():
-            self.side2_attack_var.set(False)
-            self.side2_defense_var.set(False)
-            self.side1_attack_var.set(False)
-            self.side1_defense_var.set(False)
-            self.side1_motion_var.set(False)
-        
-        # Jeśli nic nie jest zaznaczone, ustaw domyślne wartości
-        if not (self.side1_attack_var.get() or self.side1_defense_var.get() or self.side1_motion_var.get() or 
-                self.side2_attack_var.get() or self.side2_defense_var.get() or self.side2_motion_var.get()):
-            self.side1_attack_var.set(True)
             self.side2_defense_var.set(True)
-        
-        # Przywróć bindowanie
-        self.side1_attack_check.configure(command=self.on_attack_defense_change)
-        self.side1_defense_check.configure(command=self.on_attack_defense_change)
-        self.side2_attack_check.configure(command=self.on_attack_defense_change)
-        self.side2_defense_check.configure(command=self.on_attack_defense_change)
-        self.side1_motion_check.configure(command=self.on_attack_defense_change)
-        self.side2_motion_check.configure(command=self.on_attack_defense_change)
+            self.side2_motion_var.set(False)
+    
+    def on_side1_defense_change(self):
+        """Obsługuje zmianę obrony strony 1"""
+        if self.side1_defense_var.get():
+            self.side1_attack_var.set(False)
+            self.side1_motion_var.set(False)
+            self.side2_attack_var.set(True)
+            self.side2_defense_var.set(False)
+            self.side2_motion_var.set(False)
+    
+    def on_side1_motion_change(self):
+        """Obsługuje zmianę ruchu strony 1"""
+        if self.side1_motion_var.get():
+            self.side1_attack_var.set(False)
+            self.side1_defense_var.set(False)
+            self.side2_attack_var.set(False)
+            self.side2_defense_var.set(False)
+            self.side2_motion_var.set(False)
+    
+    def on_side2_attack_change(self):
+        """Obsługuje zmianę ataku strony 2"""
+        if self.side2_attack_var.get():
+            self.side2_defense_var.set(False)
+            self.side2_motion_var.set(False)
+            self.side1_attack_var.set(False)
+            self.side1_defense_var.set(True)
+            self.side1_motion_var.set(False)
+    
+    def on_side2_defense_change(self):
+        """Obsługuje zmianę obrony strony 2"""
+        if self.side2_defense_var.get():
+            self.side2_attack_var.set(False)
+            self.side2_motion_var.set(False)
+            self.side1_attack_var.set(True)
+            self.side1_defense_var.set(False)
+            self.side1_motion_var.set(False)
+    
+    def on_side2_motion_change(self):
+        """Obsługuje zmianę ruchu strony 2"""
+        if self.side2_motion_var.get():
+            self.side2_attack_var.set(False)
+            self.side2_defense_var.set(False)
+            self.side1_attack_var.set(False)
+            self.side1_defense_var.set(False)
+            self.side1_motion_var.set(False)
     
     def roll_dice(self):
         """Rzuca dwiema 4-ściennymi kośćmi i aktualizuje wyniki"""
