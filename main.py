@@ -38,6 +38,12 @@ class DiceRollerApp:
         self.dice2_losses = 0
         self.history = []  # Lista przechowująca historię rzutów
         
+        # Zmienne dla systemu atak/obrona
+        self.side1_attack = True  # Strona 1 domyślnie atak
+        self.side2_defense = True  # Strona 2 domyślnie obrona
+        self.side1_in_motion = False
+        self.side2_in_motion = False
+        
         # Utworzenie interfejsu
         self.create_widgets()
     
@@ -110,9 +116,51 @@ class DiceRollerApp:
         )
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
         
+        # Frame dla ustawień atak/obrona/w ruchu
+        combat_mode_frame = ttk.LabelFrame(game_frame, text="Rodzaj działania", padding="10")
+        combat_mode_frame.grid(row=1, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 10))
+        
+        # Strona 1 - opcje
+        side1_frame = ttk.Frame(combat_mode_frame)
+        side1_frame.grid(row=0, column=0, padx=20, sticky=tk.W)
+        ttk.Label(side1_frame, text="Strona 1:", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, sticky=tk.W)
+        
+        self.side1_attack_var = tk.BooleanVar(value=True)
+        self.side1_attack_check = ttk.Checkbutton(side1_frame, text="Atak", variable=self.side1_attack_var, command=self.on_attack_defense_change)
+        self.side1_attack_check.grid(row=1, column=0, sticky=tk.W, padx=(0, 10))
+        
+        self.side1_defense_var = tk.BooleanVar(value=False)
+        self.side1_defense_check = ttk.Checkbutton(side1_frame, text="Obrona", variable=self.side1_defense_var, command=self.on_attack_defense_change)
+        self.side1_defense_check.grid(row=1, column=1, sticky=tk.W, padx=(0, 10))
+        
+        self.side1_motion_var = tk.BooleanVar(value=False)
+        self.side1_motion_check = ttk.Checkbutton(side1_frame, text="W ruchu", variable=self.side1_motion_var)
+        self.side1_motion_check.grid(row=1, column=2, sticky=tk.W)
+        
+        # Strona 2 - opcje
+        side2_frame = ttk.Frame(combat_mode_frame)
+        side2_frame.grid(row=0, column=2, padx=20, sticky=tk.W)
+        ttk.Label(side2_frame, text="Strona 2:", font=("Arial", 10, "bold")).grid(row=0, column=0, columnspan=3, sticky=tk.W)
+        
+        self.side2_attack_var = tk.BooleanVar(value=False)
+        self.side2_attack_check = ttk.Checkbutton(side2_frame, text="Atak", variable=self.side2_attack_var, command=self.on_attack_defense_change)
+        self.side2_attack_check.grid(row=1, column=0, sticky=tk.W, padx=(0, 10))
+        
+        self.side2_defense_var = tk.BooleanVar(value=True)
+        self.side2_defense_check = ttk.Checkbutton(side2_frame, text="Obrona", variable=self.side2_defense_var, command=self.on_attack_defense_change)
+        self.side2_defense_check.grid(row=1, column=1, sticky=tk.W, padx=(0, 10))
+        
+        self.side2_motion_var = tk.BooleanVar(value=False)
+        self.side2_motion_check = ttk.Checkbutton(side2_frame, text="W ruchu", variable=self.side2_motion_var)
+        self.side2_motion_check.grid(row=1, column=2, sticky=tk.W)
+        
+        # Separator pionowy
+        separator_combat = ttk.Separator(combat_mode_frame, orient='vertical')
+        separator_combat.grid(row=0, column=1, sticky=tk.N+tk.S, padx=10)
+        
         # Frame dla wyników kości (horizontal layout)
         dice_frame = ttk.LabelFrame(game_frame, text="Wyniki", padding="15")
-        dice_frame.grid(row=1, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 20))
+        dice_frame.grid(row=2, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 20))
         
         # Pierwsza strona - liczba ludzi i nazwa
         people1_frame = ttk.Frame(dice_frame)
@@ -149,6 +197,15 @@ class DiceRollerApp:
         )
         self.dice1_exp_icon.grid(row=0, column=1, padx=(5, 0))
         
+        # Opis wyniku taktycznego strona 1
+        self.dice1_tactical_result = ttk.Label(
+            dice_frame,
+            text="",
+            font=("Arial", 9, "italic"),
+            foreground="darkgreen"
+        )
+        self.dice1_tactical_result.grid(row=4, column=0, padx=20, pady=(5, 0))
+        
         # Druga strona - liczba ludzi i nazwa
         people2_frame = ttk.Frame(dice_frame)
         people2_frame.grid(row=0, column=2, padx=20)
@@ -184,6 +241,15 @@ class DiceRollerApp:
         )
         self.dice2_exp_icon.grid(row=0, column=1, padx=(5, 0))
         
+        # Opis wyniku taktycznego strona 2
+        self.dice2_tactical_result = ttk.Label(
+            dice_frame,
+            text="",
+            font=("Arial", 9, "italic"),
+            foreground="darkgreen"
+        )
+        self.dice2_tactical_result.grid(row=4, column=2, padx=20, pady=(5, 0))
+        
         # Separator pionowy
         separator = ttk.Separator(dice_frame, orient='vertical')
         separator.grid(row=0, column=1, rowspan=4, sticky=tk.N+tk.S, padx=10)
@@ -195,7 +261,7 @@ class DiceRollerApp:
             command=self.roll_dice,
             style="Roll.TButton"
         )
-        self.roll_button.grid(row=2, column=0, columnspan=3, pady=20)
+        self.roll_button.grid(row=3, column=0, columnspan=3, pady=20)
         
         # Stylizacja przycisku
         style = ttk.Style()
@@ -203,7 +269,7 @@ class DiceRollerApp:
         
         # Frame dla modyfikatorów
         modifiers_frame = ttk.LabelFrame(game_frame, text="Modyfikatory", padding="10")
-        modifiers_frame.grid(row=3, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(10, 0))
+        modifiers_frame.grid(row=4, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(10, 0))
         
         # Lewa kolumna - Strona 1
         left_frame = ttk.LabelFrame(modifiers_frame, text="Strona 1", padding="10")
@@ -303,7 +369,7 @@ class DiceRollerApp:
             font=("Arial", 10),
             foreground="gray"
         )
-        info_label.grid(row=4, column=0, columnspan=3, pady=(10, 0))
+        info_label.grid(row=5, column=0, columnspan=3, pady=(10, 0))
         
         # Konfiguracja rozciągania kolumn
         main_frame.columnconfigure(0, weight=2)  # Gra
@@ -323,6 +389,41 @@ class DiceRollerApp:
         
         # Bind Enter key to roll dice
         self.root.bind('<Return>', lambda event: self.roll_dice())
+    
+    def on_attack_defense_change(self):
+        """Zapewnia, że tylko jedna strona może być atakiem lub obroną"""
+        # Sprawdzanie czy strona 1 została zaznaczona jako atak
+        if self.side1_attack_var.get():
+            self.side1_defense_var.set(False)
+            self.side2_attack_var.set(False)
+            if not self.side2_defense_var.get():
+                self.side2_defense_var.set(True)
+        
+        # Sprawdzanie czy strona 1 została zaznaczona jako obrona
+        elif self.side1_defense_var.get():
+            self.side1_attack_var.set(False)
+            self.side2_defense_var.set(False)
+            if not self.side2_attack_var.get():
+                self.side2_attack_var.set(True)
+        
+        # Sprawdzanie czy strona 2 została zaznaczona jako atak
+        elif self.side2_attack_var.get():
+            self.side2_defense_var.set(False)
+            self.side1_attack_var.set(False)
+            if not self.side1_defense_var.get():
+                self.side1_defense_var.set(True)
+        
+        # Sprawdzanie czy strona 2 została zaznaczona jako obrona
+        elif self.side2_defense_var.get():
+            self.side2_attack_var.set(False)
+            self.side1_defense_var.set(False)
+            if not self.side1_attack_var.get():
+                self.side1_attack_var.set(True)
+        
+        # Jeśli nic nie jest zaznaczone, ustaw domyślne wartości
+        if not (self.side1_attack_var.get() or self.side1_defense_var.get() or self.side2_attack_var.get() or self.side2_defense_var.get()):
+            self.side1_attack_var.set(True)
+            self.side2_defense_var.set(True)
     
     def roll_dice(self):
         """Rzuca dwiema 4-ściennymi kośćmi i aktualizuje wyniki"""
@@ -429,6 +530,9 @@ class DiceRollerApp:
         self.dice1_exp_icon.config(text="⭐ Doświadczenie +" if self.dice1_gets_exp else "")
         self.dice2_exp_icon.config(text="⭐ Doświadczenie +" if self.dice2_gets_exp else "")
         
+        # Obliczanie i wyświetlanie wyników taktycznych
+        self.calculate_and_display_tactical_results(dice1_final, dice2_final)
+        
         # Dodanie do historii
         self.add_to_history(dice1_final, dice2_final)
         
@@ -438,6 +542,75 @@ class DiceRollerApp:
         
         # Komunikat o wyniku w zależności od rzutu
         self.display_result_message()
+    
+    def calculate_and_display_tactical_results(self, dice1_final, dice2_final):
+        """Oblicza i wyświetla wyniki taktyczne na podstawie systemu atak/obrona"""
+        # Sprawdzanie kto atakuje, a kto broni
+        attacking_side = None
+        defending_side = None
+        attack_result = 0
+        defense_result = 0
+        
+        if self.side1_attack_var.get():
+            attacking_side = 1
+            defending_side = 2
+            attack_result = dice1_final
+            defense_result = dice2_final
+        elif self.side2_attack_var.get():
+            attacking_side = 2
+            defending_side = 1
+            attack_result = dice2_final
+            defense_result = dice1_final
+        else:
+            # Brak jasnego ataku/obrony - wyczyść opisy
+            self.dice1_tactical_result.config(text="")
+            self.dice2_tactical_result.config(text="")
+            return
+        
+        # Obliczanie wyniku taktycznego
+        tactical_outcome = self.get_tactical_outcome(attack_result, defense_result)
+        outcome_description = self.get_tactical_description(tactical_outcome)
+        
+        # Wyświetlanie wyniku
+        if attacking_side == 1:
+            self.dice1_tactical_result.config(text=f"Wynik ataku: {outcome_description}")
+            self.dice2_tactical_result.config(text=f"Wynik obrony: {outcome_description}")
+        else:
+            self.dice1_tactical_result.config(text=f"Wynik obrony: {outcome_description}")
+            self.dice2_tactical_result.config(text=f"Wynik ataku: {outcome_description}")
+    
+    def get_tactical_outcome(self, attack_result, defense_result):
+        """Określa wynik taktyczny na skali 1-6"""
+        difference = attack_result - defense_result
+        
+        if difference <= 0:
+            # Obrona wygrywa lub remis - dodajemy element losowości
+            if difference == 0 or (difference == -1 and random.random() < 0.3):
+                return 1  # Pozycja nienaruszona (z 30% szansą przy -1)
+            else:
+                return 1  # Pozycja nienaruszona
+        elif difference == 1:
+            return 2  # Lokalne wejście
+        elif difference == 2:
+            return 3  # Częściowe wysunięcie  
+        elif difference == 3:
+            return 4  # Wyłom taktyczny
+        elif difference == 4:
+            return 5  # Załamanie obrony
+        else:  # difference >= 5
+            return 6  # Przełamanie strategiczne
+    
+    def get_tactical_description(self, outcome):
+        """Zwraca opis wyniku taktycznego"""
+        descriptions = {
+            1: "Pozycja nienaruszona",
+            2: "Lokalne wejście", 
+            3: "Częściowe wysunięcie",
+            4: "Wyłom taktyczny",
+            5: "Załamanie obrony",
+            6: "Przełamanie strategiczne"
+        }
+        return descriptions.get(outcome, "Nieznany wynik")
     
     def calculate_battle_results(self, dice1_final, dice2_final):
         """Oblicza wyniki bitwy na podstawie rzutów kośćmi"""
