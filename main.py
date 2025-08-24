@@ -566,7 +566,6 @@ class DiceRollerApp:
         # Obliczanie przewagi liczebnej (2.1x = +1, 4.2x = +2, itd.)
         numerical_advantage_1 = 0
         numerical_advantage_2 = 0
-        self.numerical_advantage_message = ""
         
         if self.dice1_people_original > 0 and self.dice2_people_original > 0:
             ratio_1_vs_2 = self.dice1_people_original / self.dice2_people_original
@@ -574,10 +573,8 @@ class DiceRollerApp:
             
             if ratio_1_vs_2 >= 2.1:
                 numerical_advantage_1 = int(ratio_1_vs_2 / 2.1)
-                self.numerical_advantage_message = f"Przewaga liczebna Strony 1: +{numerical_advantage_1}"
             elif ratio_2_vs_1 >= 2.1:
                 numerical_advantage_2 = int(ratio_2_vs_1 / 2.1)
-                self.numerical_advantage_message = f"Przewaga liczebna Strony 2: +{numerical_advantage_2}"
         
         # Dodanie bonusów doświadczenia do zakresu i modyfikatora
         dice1_exp = self.dice1_exp_var.get() if self.dice1_exp_var.get() > 0 else 0
@@ -652,9 +649,7 @@ class DiceRollerApp:
         self.dice1_people_result_label.config(text=dice1_text)
         self.dice2_people_result_label.config(text=dice2_text)
         
-        # Ukrycie informacji o przewadze liczebnej (teraz wyświetlana w tabeli wyników)
-        if hasattr(self, 'advantage_label'):
-            self.advantage_label.config(text="")
+        # Informacja o przewadze liczebnej wyświetlana w tabeli wyników
         
         # Aktualizacja ikon doświadczenia
         self.dice1_exp_icon.config(text="⭐ Doświadczenie +" if self.dice1_gets_exp else "")
