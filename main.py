@@ -1939,21 +1939,22 @@ class DiceRollerApp:
         buttons_bottom_frame.grid(row=row, column=0, columnspan=2, pady=(5, 0))
         
         ttk.Button(buttons_bottom_frame, text="Eksportuj dane", command=self.export_unit_data).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(buttons_bottom_frame, text="📋", command=lambda: self.show_unit_battle_history(unit_data), width=3).pack(side=tk.LEFT, padx=(5, 0))
-        ttk.Button(buttons_bottom_frame, text="🗑️", command=lambda: self.delete_unit(unit_data), width=3).pack(side=tk.LEFT, padx=(5, 0))
+        ttk.Button(buttons_bottom_frame, text="📋", command=lambda unit_data=unit_data: self.show_unit_battle_history(unit_data), width=3).pack(side=tk.LEFT, padx=(5, 0))
+        ttk.Button(buttons_bottom_frame, text="🗑️", command=lambda unit_data=unit_data: self.delete_unit(unit_data), width=3).pack(side=tk.LEFT, padx=(5, 0))
     
     def delete_unit(self, unit_data):
         """Usuwa jednostkę"""
-        unit_name = unit_data['nazwa']
-        unit_side = self.current_unit_side
+        unit_id = unit_data['id']
+        unit_side = unit_data['strona']
+        display_name = self.get_unit_display_name(unit_id, unit_side)
         
         # Potwierdzenie usunięcia
-        if not messagebox.askyesno("Potwierdzenie", f"Czy na pewno chcesz usunąć jednostkę '{unit_name}'?\n\nTa operacja jest nieodwracalna!"):
+        if not messagebox.askyesno("Potwierdzenie", f"Czy na pewno chcesz usunąć jednostkę '{display_name}'?\n\nTa operacja jest nieodwracalna!"):
             return
         
         # Sprawdź czy jednostka nie uczestniczy w bitwie
-        participating_in_side1 = any(u['name'] == unit_name for u in self.participating_units["strona1"])
-        participating_in_side2 = any(u['name'] == unit_name for u in self.participating_units["strona2"])
+        participating_in_side1 = any(u['name'] == unit_id for u in self.participating_units["strona1"])
+        participating_in_side2 = any(u['name'] == unit_id for u in self.participating_units["strona2"])
         
         if participating_in_side1 or participating_in_side2:
             messagebox.showwarning("Błąd", "Nie można usunąć jednostki która uczestniczy w bitwie!\nPierw zresetuj jednostki biorące udział w bitwie.")
@@ -1962,7 +1963,7 @@ class DiceRollerApp:
         # Historia jednostki zostanie usunięta wraz z jednostką
         
         # Usuń jednostkę
-        del self.units[unit_side][unit_name]
+        del self.units[unit_side][unit_id]
         
         # Ukryj szczegóły
         self.hide_unit_details()
@@ -1971,10 +1972,10 @@ class DiceRollerApp:
         self.save_units()
         
         # Aktualizuj wyświetlanie
-        self.update_units_display()
+        self.update_units_combos()
         self.update_battle_units_combos()
         
-        messagebox.showinfo("Sukces", f"Jednostka '{unit_name}' została usunięta.")
+        messagebox.showinfo("Sukces", f"Jednostka '{display_name}' została usunięta.")
     
     def hide_unit_details(self):
         """Ukrywa szczegóły jednostki"""
@@ -1994,51 +1995,69 @@ class DiceRollerApp:
             # Aktualizacja danych jednostki
             unit_data = self.units[self.current_unit_side][self.current_unit]
             
-            # Nazwa
-            old_name = unit_data["nazwa"]
-            new_name = self.unit_name_var.get().strip()
-            if new_name and new_name != old_name:
-                # Sprawdź czy nowa nazwa już istnieje
-                if (new_name not in self.units["własne"] and new_name not in self.units["wroga"]):
-                    # Zmień nazwę klucza w słowniku
-                    del self.units[self.current_unit_side][self.current_unit]
-                    self.current_unit = new_name
-                    unit_data["nazwa"] = new_name
-                    self.units[self.current_unit_side][new_name] = unit_data
-                    self.update_units_combos()
-                    # Zaktualizuj wybór w combobox
-                    if self.current_unit_side == "własne":
-                        self.own_units_var.set(new_name)
-                    else:
-                        self.enemy_units_var.set(new_name)
-                    # Zaktualizuj tytuł
-                    self.unit_details_frame.config(text=f"Szczegóły: {new_name} ({self.current_unit_side})")
+            # Aktualizacja numeru
+            if hasattr(self, 'unit_number_var'):
+                numer = int(self.unit_number_var.get() or 1)
+                unit_data["numer"] = numer
+            
+            # Aktualizacja typu
+            if hasattr(self, 'unit_type_var'):
+                unit_data["typ"] = self.unit_type_var.get()
+            
+            # Aktualizacja batalionu
+            if hasattr(self, 'unit_battalion_var'):
+                battalion_name = self.unit_battalion_var.get()
+                battalion_id = None
+                if battalion_name:
+                    for bid, data in self.battalions.items():
+                        if data['nazwa'] == battalion_name:
+                            battalion_id = bid
+                            break
+                unit_data["batalion"] = battalion_id
+            
+            # Aktualizuj wyświetlaną nazwę w interfejsie
+            new_display_name = self.get_unit_display_name(self.current_unit, self.current_unit_side)
+            if self.current_unit_side == "własne":
+                self.own_units_var.set(new_display_name)
+            else:
+                self.enemy_units_var.set(new_display_name)
+            
+            # Aktualizuj tytuł szczegółów
+            self.unit_details_frame.config(text=f"Szczegóły: {new_display_name} ({self.current_unit_side})")
+            
+            # Aktualizuj comboboxy
+            self.update_units_combos()
             
             # Liczba ludzi (max 150)
-            people = int(self.unit_people_var.get() or 0)
-            people = max(0, min(150, people))
-            unit_data["liczba_ludzi"] = people
-            self.unit_people_var.set(str(people))
+            if hasattr(self, 'unit_people_var'):
+                people = int(self.unit_people_var.get() or 0)
+                people = max(0, min(150, people))
+                unit_data["liczba_ludzi"] = people
+                self.unit_people_var.set(str(people))
             
             # Doświadczenie
-            exp = int(self.unit_exp_var.get() or 0)
-            unit_data["doświadczenie"] = exp
+            if hasattr(self, 'unit_exp_var'):
+                exp = int(self.unit_exp_var.get() or 0)
+                unit_data["doświadczenie"] = exp
             
             # Zapasy (max 3)
-            supplies = int(self.unit_supplies_var.get() or 0)
-            supplies = max(0, min(3, supplies))
-            unit_data["zapasy"] = supplies
-            self.unit_supplies_var.set(str(supplies))
+            if hasattr(self, 'unit_supplies_var'):
+                supplies = int(self.unit_supplies_var.get() or 0)
+                supplies = max(0, min(3, supplies))
+                unit_data["zapasy"] = supplies
+                self.unit_supplies_var.set(str(supplies))
             
             # Zwycięstwa
-            victories = int(self.unit_victories_var.get() or 0)
-            victories = max(0, victories)
-            unit_data["liczba_zwycięstw"] = victories
+            if hasattr(self, 'unit_victories_var'):
+                victories = int(self.unit_victories_var.get() or 0)
+                victories = max(0, victories)
+                unit_data["liczba_zwycięstw"] = victories
             
             # Uzupełnienia
-            reinforcements = int(self.unit_reinforcements_var.get() or 0)
-            reinforcements = max(0, reinforcements)
-            unit_data["liczba_uzupełnień"] = reinforcements
+            if hasattr(self, 'unit_reinforcements_var'):
+                reinforcements = int(self.unit_reinforcements_var.get() or 0)
+                reinforcements = max(0, reinforcements)
+                unit_data["liczba_uzupełnień"] = reinforcements
             
         except ValueError:
             # Ignoruj błędy konwersji podczas wpisywania
@@ -2645,7 +2664,8 @@ class DiceRollerApp:
         
         # Utworzenie okna historii
         history_window = tk.Toplevel(self.root)
-        history_window.title(f"Historia bitew: {unit_data['nazwa']}")
+        display_name = self.get_unit_display_name(unit_data['id'], unit_data['strona'])
+        history_window.title(f"Historia bitew: {display_name}")
         history_window.geometry("500x400")
         history_window.resizable(True, True)
         
