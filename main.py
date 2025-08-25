@@ -630,9 +630,11 @@ class DiceRollerApp:
         )
         self.dice1_label.grid(row=2, column=0, padx=20, pady=10)
         
-        # Ikon dla jednostek strony 1
-        self.side1_units_label = ttk.Label(dice_frame, text="", font=("Arial", 10))
-        self.side1_units_label.grid(row=3, column=0, padx=20)
+        # Lista jednostek strony 1
+        self.side1_units_frame = ttk.Frame(dice_frame)
+        self.side1_units_frame.grid(row=3, column=0, padx=20, sticky=tk.W+tk.E+tk.N+tk.S)
+        self.side1_units_label = ttk.Label(self.side1_units_frame, text="", font=("Arial", 9))
+        self.side1_units_label.grid(row=0, column=0, sticky=tk.W)
         
         # Wynik liczby ludzi i ikona doświadczenia strona 1
         result1_frame = ttk.Frame(dice_frame)
@@ -670,9 +672,11 @@ class DiceRollerApp:
         )
         self.dice2_label.grid(row=2, column=2, padx=20, pady=10)
         
-        # Ikon dla jednostek strony 2
-        self.side2_units_label = ttk.Label(dice_frame, text="", font=("Arial", 10))
-        self.side2_units_label.grid(row=3, column=2, padx=20)
+        # Lista jednostek strony 2
+        self.side2_units_frame = ttk.Frame(dice_frame)
+        self.side2_units_frame.grid(row=3, column=2, padx=20, sticky=tk.W+tk.E+tk.N+tk.S)
+        self.side2_units_label = ttk.Label(self.side2_units_frame, text="", font=("Arial", 9))
+        self.side2_units_label.grid(row=0, column=0, sticky=tk.W)
         
         # Wynik liczby ludzi i ikona doświadczenia strona 2
         result2_frame = ttk.Frame(dice_frame)
@@ -2417,7 +2421,7 @@ class DiceRollerApp:
         self.distribute_losses_for_side(2)
     
     def distribute_losses_for_side(self, side_number):
-        """Rozdziela straty dla określonej strony"""
+        """Rozdziela straty dla określonej strony uwzględniając doświadczenie i rozmiar"""
         all_units = self.get_all_participating_units(side_number)
         
         if not all_units:
@@ -2432,22 +2436,74 @@ class DiceRollerApp:
             
         if total_losses <= 0:
             return
-            
-        losses_per_unit = total_losses // len(all_units)
-        remainder = total_losses % len(all_units)
         
-        for i, unit in enumerate(all_units):
-            losses = losses_per_unit
-            if i < remainder:
-                losses += 1
+        # Oblicz współczynniki strat dla każdej jednostki
+        loss_factors = []
+        total_factor = 0
+        
+        for unit in all_units:
+            unit_id = self.get_unit_id(unit)
+            
+            # Znajdź dane jednostki w głównym słowniku
+            unit_data = None
+            for side_name in ['własne', 'wroga']:
+                if unit_id in self.units[side_name]:
+                    unit_data = self.units[side_name][unit_id]
+                    break
+            
+            if unit_data:
+                experience = unit_data.get('doświadczenie', 0)
+                people_count = unit_data.get('liczba_ludzi', 150)
+                
+                # Współczynnik doświadczenia (główny wpływ)
+                # Doświadczenie -2 = 1.4x więcej strat, +2 = 0.6x mniej strat
+                exp_factor = 1.0 - (experience * 0.2)  # Każdy poziom doświadczenia to 20% różnicy
+                exp_factor = max(0.3, min(1.7, exp_factor))  # Ogranicz do rozsądnych wartości
+                
+                # Współczynnik rozmiaru (mały wpływ)
+                # Większe jednostki nieznacznie więcej strat (max 10% różnicy)
+                size_factor = 1.0 + ((people_count - 75) / 750)  # Normalizacja względem 75 ludzi
+                size_factor = max(0.95, min(1.05, size_factor))  # Ogranicz do 5% różnicy w każdą stronę
+                
+                # Końcowy współczynnik
+                final_factor = exp_factor * size_factor
+            else:
+                final_factor = 1.0
+            
+            loss_factors.append(final_factor)
+            total_factor += final_factor
+        
+        # Rozdziel straty proporcjonalnie do współczynników
+        losses_detail = []
+        total_assigned = 0
+        
+        for i, (unit, factor) in enumerate(zip(all_units, loss_factors)):
+            if i == len(all_units) - 1:  # Ostatnia jednostka dostaje resztę
+                losses = total_losses - total_assigned
+            else:
+                losses = int((total_losses * factor) / total_factor)
+                total_assigned += losses
+            
+            losses = max(0, losses)  # Nie może być ujemnych strat
             
             unit_id = self.get_unit_id(unit)
             
             # Aktualizuj w głównym słowniku jednostek
             for side_name in ['własne', 'wroga']:
                 if unit_id in self.units[side_name]:
-                    new_people = max(0, self.units[side_name][unit_id]['liczba_ludzi'] - losses)
+                    old_people = self.units[side_name][unit_id]['liczba_ludzi']
+                    new_people = max(0, old_people - losses)
                     self.units[side_name][unit_id]['liczba_ludzi'] = new_people
+                    
+                    # Zapisz szczegóły do raportu
+                    display_name = self.get_unit_display_name(unit_id, side_name)
+                    losses_detail.append({
+                        'name': display_name,
+                        'losses': losses,
+                        'before': old_people,
+                        'after': new_people,
+                        'experience': self.units[side_name][unit_id].get('doświadczenie', 0)
+                    })
                     
                     # Aktualizuj także w participating_units jeśli tam jest
                     for pu in self.participating_units[participating_key]:
@@ -2455,6 +2511,32 @@ class DiceRollerApp:
                             pu['people'] = new_people
                             break
                     break
+        
+        # Wyświetl szczegółowy raport strat jeśli więcej niż 1 jednostka
+        if len(losses_detail) > 1:
+            self.show_losses_report(side_number, losses_detail)
+    
+    def show_losses_report(self, side_number, losses_detail):
+        """Pokazuje szczegółowy raport strat"""
+        side_name = "Strona 1" if side_number == 1 else "Strona 2"
+        
+        report_lines = [f"📊 Szczegółowy raport strat - {side_name}:"]
+        report_lines.append("═" * 50)
+        
+        for detail in losses_detail:
+            exp_text = f"(Dośw: {detail['experience']:+d})" if detail['experience'] != 0 else "(Dośw: 0)"
+            report_lines.append(
+                f"• {detail['name']} {exp_text}\n"
+                f"  Straty: {detail['losses']} ludzi\n"
+                f"  Stan: {detail['before']} → {detail['after']} ludzi"
+            )
+        
+        total_losses = sum(d['losses'] for d in losses_detail)
+        report_lines.append("═" * 50)
+        report_lines.append(f"Łączne straty: {total_losses} ludzi")
+        
+        # Wyświetl w messagebox
+        messagebox.showinfo(f"Raport strat - {side_name}", "\n".join(report_lines))
     
     def add_more_units_side(self, side_number):
         """Dodaje jednostkę do udziału w bitwie dla określonej strony"""
@@ -2507,7 +2589,8 @@ class DiceRollerApp:
             # Aktualizuj combobox - ukryj dodane jednostki
             self.update_battle_units_combos()
             
-            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 1! (Dodano: {unit_people}, Łącznie: {new_total})")
+            unit_display_name = self.get_unit_display_name(self.selected_unit_side1, self.unit_side1_type)
+            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 1!\n{unit_display_name}\n(Dodano: {unit_people}, Łącznie: {new_total})")
             
         elif side_number == 2:
             # Strona 2
@@ -2558,7 +2641,8 @@ class DiceRollerApp:
             # Aktualizuj combobox - ukryj dodane jednostki
             self.update_battle_units_combos()
             
-            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 2! (Dodano: {unit_people}, Łącznie: {new_total})")
+            unit_display_name = self.get_unit_display_name(self.selected_unit_side2, self.unit_side2_type)
+            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 2!\n{unit_display_name}\n(Dodano: {unit_people}, Łącznie: {new_total})")
         
         # Aktualizuj wyświetlanie
         self.update_units_display()
@@ -2591,24 +2675,84 @@ class DiceRollerApp:
         self.update_battle_units_combos()
     
     def update_units_display(self):
-        """Aktualizuje wyświetlanie ikon jednostek"""
-        # Ikon dla strony 1
-        if hasattr(self, 'side1_units_label'):
-            if self.participating_units["strona1"]:
-                icons = "🪖" * len(self.participating_units["strona1"])
-                total_people = sum(u['people'] for u in self.participating_units["strona1"])
-                self.side1_units_label.config(text=f"{icons} ({total_people} ludzi)")
-            else:
-                self.side1_units_label.config(text="")
+        """Aktualizuje wyświetlanie szczegółowej listy jednostek"""
+        self.update_side_units_display(1)
+        self.update_side_units_display(2)
+    
+    def update_side_units_display(self, side_number):
+        """Aktualizuje wyświetlanie jednostek dla konkretnej strony"""
+        if side_number == 1:
+            frame = self.side1_units_frame
+            label = self.side1_units_label
+            units = self.participating_units["strona1"]
+        else:
+            frame = self.side2_units_frame
+            label = self.side2_units_label
+            units = self.participating_units["strona2"]
         
-        # Ikon dla strony 2
-        if hasattr(self, 'side2_units_label'):
-            if self.participating_units["strona2"]:
-                icons = "🪖" * len(self.participating_units["strona2"])
-                total_people = sum(u['people'] for u in self.participating_units["strona2"])
-                self.side2_units_label.config(text=f"{icons} ({total_people} ludzi)")
-            else:
-                self.side2_units_label.config(text="")
+        # Wyczyść poprzednie elementy (oprócz głównej etykiety)
+        for widget in frame.winfo_children():
+            if widget != label:
+                widget.destroy()
+        
+        if units:
+            # Nagłówek
+            total_people = sum(u['people'] for u in units)
+            header = f"🪖 {len(units)} jednostek ({total_people} ludzi):"
+            label.config(text=header)
+            
+            # Lista jednostek z przyciskami usuwania
+            for i, unit in enumerate(units):
+                unit_frame = ttk.Frame(frame)
+                unit_frame.grid(row=i+1, column=0, sticky=tk.W, pady=1)
+                
+                # Nazwa jednostki
+                unit_id = self.get_unit_id(unit)
+                side_name = unit.get('side', '')
+                display_name = self.get_unit_display_name(unit_id, side_name)
+                
+                ttk.Label(unit_frame, text=f"• {display_name}", font=("Arial", 8)).grid(row=0, column=0, sticky=tk.W)
+                
+                # Przycisk usuwania
+                remove_btn = ttk.Button(unit_frame, text="✖", width=3, 
+                                      command=lambda idx=i, side=side_number: self.remove_unit_from_side(side, idx))
+                remove_btn.grid(row=0, column=1, padx=(5, 0))
+        else:
+            label.config(text="")
+    
+    def remove_unit_from_side(self, side_number, unit_index):
+        """Usuwa jednostkę z udziału w bitwie"""
+        if side_number == 1:
+            side_key = "strona1"
+        else:
+            side_key = "strona2"
+        
+        if 0 <= unit_index < len(self.participating_units[side_key]):
+            removed_unit = self.participating_units[side_key].pop(unit_index)
+            
+            # Przelicz liczbę ludzi
+            if side_number == 1 and self.side1_locked:
+                current_total = int(self.dice1_people_var.get() or "0")
+                new_total = current_total - removed_unit['people']
+                self.dice1_people_var.set(str(max(0, new_total)))
+                
+                # Jeśli to była ostatnia jednostka, odblokuj automatyczne uzupełnianie
+                if not self.participating_units["strona1"]:
+                    self.side1_locked = False
+            
+            elif side_number == 2 and self.side2_locked:
+                current_total = int(self.dice2_people_var.get() or "0")
+                new_total = current_total - removed_unit['people']
+                self.dice2_people_var.set(str(max(0, new_total)))
+                
+                # Jeśli to była ostatnia jednostka, odblokuj automatyczne uzupełnianie
+                if not self.participating_units["strona2"]:
+                    self.side2_locked = False
+            
+            # Aktualizuj wyświetlanie
+            self.update_units_display()
+            self.update_exp_bonuses_display()
+            self.update_battle_units_combos()
     
     def add_to_unit_battle_history(self, dice1_final, dice2_final):
         """Dodaje informacje o bitwie do historii jednostek"""
