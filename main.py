@@ -1308,18 +1308,31 @@ class DiceRollerApp:
     
     def add_to_history(self, dice1_final, dice2_final):
         """Dodaje wynik do historii"""
-        # Zbierz informacje o jednostkach uczestniczących
-        side1_units = [u['name'] for u in self.participating_units["strona1"]]
-        side2_units = [u['name'] for u in self.participating_units["strona2"]]
+        # Zbierz informacje o jednostkach uczestniczących z sformatowanymi nazwami
+        side1_units = []
+        for u in self.participating_units["strona1"]:
+            unit_id = u.get('id', u.get('name', ''))
+            side_name = u.get('side', '')
+            display_name = self.get_unit_display_name(unit_id, side_name) if unit_id and side_name else u.get('name', unit_id)
+            side1_units.append(display_name)
+            
+        side2_units = []
+        for u in self.participating_units["strona2"]:
+            unit_id = u.get('id', u.get('name', ''))
+            side_name = u.get('side', '')
+            display_name = self.get_unit_display_name(unit_id, side_name) if unit_id and side_name else u.get('name', unit_id)
+            side2_units.append(display_name)
         
         # Dodaj jednostki wybrane normalnie (nie przez "Dodaj więcej")
         if self.selected_unit_side1 and self.unit_side1_type != "brak":
-            if self.selected_unit_side1 not in side1_units:
-                side1_units.append(self.selected_unit_side1)
+            display_name = self.get_unit_display_name(self.selected_unit_side1, self.unit_side1_type)
+            if display_name not in side1_units:
+                side1_units.append(display_name)
         
         if self.selected_unit_side2 and self.unit_side2_type != "brak":
-            if self.selected_unit_side2 not in side2_units:
-                side2_units.append(self.selected_unit_side2)
+            display_name = self.get_unit_display_name(self.selected_unit_side2, self.unit_side2_type)
+            if display_name not in side2_units:
+                side2_units.append(display_name)
         
         # Określ tryb walki - użyj poprawnych nazw zmiennych
         side1_attacking = self.side1_attack_var.get()
@@ -2311,8 +2324,14 @@ class DiceRollerApp:
         side1_won = dice1_final > 1 and dice1_final > dice2_final
         total_losses_1 = max(0, self.dice1_people_original - self.dice1_people_result)
         
-        # Debug info
-        print(f"DEBUG: Strona 1 - jednostki: {[u['name'] for u in all_side1_units]}, wygrała: {side1_won}")
+        # Debug info - pokaż sformatowane nazwy
+        side1_display_names = []
+        for u in all_side1_units:
+            unit_id = u.get('id', u.get('name', ''))
+            side_name = u.get('side', '')
+            display_name = self.get_unit_display_name(unit_id, side_name) if unit_id and side_name else u.get('name', unit_id)
+            side1_display_names.append(display_name)
+        print(f"DEBUG: Strona 1 - jednostki: {side1_display_names}, wygrała: {side1_won}")
         
         for unit in all_side1_units:
             unit_name = unit['name']
@@ -2347,8 +2366,14 @@ class DiceRollerApp:
         side2_won = dice2_final > 1 and dice2_final > dice1_final
         total_losses_2 = max(0, self.dice2_people_original - self.dice2_people_result)
         
-        # Debug info
-        print(f"DEBUG: Strona 2 - jednostki: {[u['name'] for u in all_side2_units]}, wygrała: {side2_won}")
+        # Debug info - pokaż sformatowane nazwy
+        side2_display_names = []
+        for u in all_side2_units:
+            unit_id = u.get('id', u.get('name', ''))
+            side_name = u.get('side', '')
+            display_name = self.get_unit_display_name(unit_id, side_name) if unit_id and side_name else u.get('name', unit_id)
+            side2_display_names.append(display_name)
+        print(f"DEBUG: Strona 2 - jednostki: {side2_display_names}, wygrała: {side2_won}")
         
         for unit in all_side2_units:
             unit_name = unit['name']
@@ -2577,18 +2602,35 @@ class DiceRollerApp:
         """Dodaje informacje o bitwie do historii jednostek"""
         import datetime
         
-        # Zbierz informacje o bitwie
-        side1_units = [u['name'] for u in self.participating_units["strona1"]]
-        side2_units = [u['name'] for u in self.participating_units["strona2"]]
+        # Zbierz ID jednostek (do operacji na danych) i nazwy (do wyświetlania)
+        side1_unit_ids = [u.get('id', u.get('name', '')) for u in self.participating_units["strona1"]]
+        side2_unit_ids = [u.get('id', u.get('name', '')) for u in self.participating_units["strona2"]]
+        
+        # Nazwy do wyświetlania w historii
+        side1_display_names = []
+        for u in self.participating_units["strona1"]:
+            unit_id = u.get('id', u.get('name', ''))
+            side_name = u.get('side', '')
+            display_name = self.get_unit_display_name(unit_id, side_name) if unit_id and side_name else u.get('name', unit_id)
+            side1_display_names.append(display_name)
+            
+        side2_display_names = []
+        for u in self.participating_units["strona2"]:
+            unit_id = u.get('id', u.get('name', ''))
+            side_name = u.get('side', '')
+            display_name = self.get_unit_display_name(unit_id, side_name) if unit_id and side_name else u.get('name', unit_id)
+            side2_display_names.append(display_name)
         
         # Dodaj jednostki wybrane normalnie
         if self.selected_unit_side1 and self.unit_side1_type != "brak":
-            if self.selected_unit_side1 not in side1_units:
-                side1_units.append(self.selected_unit_side1)
+            if self.selected_unit_side1 not in side1_unit_ids:
+                side1_unit_ids.append(self.selected_unit_side1)
+                side1_display_names.append(self.get_unit_display_name(self.selected_unit_side1, self.unit_side1_type))
         
         if self.selected_unit_side2 and self.unit_side2_type != "brak":
-            if self.selected_unit_side2 not in side2_units:
-                side2_units.append(self.selected_unit_side2)
+            if self.selected_unit_side2 not in side2_unit_ids:
+                side2_unit_ids.append(self.selected_unit_side2)
+                side2_display_names.append(self.get_unit_display_name(self.selected_unit_side2, self.unit_side2_type))
         
         # Określ tryb walki - użyj poprawnych nazw zmiennych  
         side1_attacking = self.side1_attack_var.get()
@@ -2602,8 +2644,8 @@ class DiceRollerApp:
             'przeciwnik_kostka': None,
             'straty': 0,
             'zwyciestwo': False,
-            'side1_units': side1_units,
-            'side2_units': side2_units,
+            'side1_units': side1_display_names,
+            'side2_units': side2_display_names,
             'side1_attacking': side1_attacking,
             'side2_attacking': side2_attacking,
             'side1_in_motion': side1_in_motion,
@@ -2614,10 +2656,12 @@ class DiceRollerApp:
         all_side1_units = list(self.participating_units["strona1"])
         if self.selected_unit_side1 and self.unit_side1_type != "brak":
             # Dodaj jednostkę wybraną normalnie, jeśli nie jest już w participating
-            if not any(u['name'] == self.selected_unit_side1 for u in all_side1_units):
+            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side1 for u in all_side1_units):
                 all_side1_units.append({
-                    'name': self.selected_unit_side1,
-                    'people': self.dice1_people_original
+                    'id': self.selected_unit_side1,
+                    'name': self.selected_unit_side1,  # dla kompatybilności
+                    'people': self.dice1_people_original,
+                    'side': self.unit_side1_type
                 })
         
         # Historia dla jednostek strony 1
@@ -2642,26 +2686,28 @@ class DiceRollerApp:
                     unit_battle_info = battle_info_side1.copy()
                     unit_battle_info['straty'] = unit_losses
                     # Dodaj informacje specyficzne dla strony 1
-                    unit_battle_info['friendly_units'] = side1_units
-                    unit_battle_info['enemy_units'] = side2_units
+                    unit_battle_info['friendly_units'] = side1_display_names
+                    unit_battle_info['enemy_units'] = side2_display_names
                     
                     # Dodaj do historii jednostki
-                    unit_name = unit['name']
+                    unit_id = unit.get('id', unit.get('name', ''))
                     for side_name in ['własne', 'wroga']:
-                        if unit_name in self.units[side_name]:
-                            if 'historia_bitew' not in self.units[side_name][unit_name]:
-                                self.units[side_name][unit_name]['historia_bitew'] = []
-                            self.units[side_name][unit_name]['historia_bitew'].append(unit_battle_info)
+                        if unit_id in self.units[side_name]:
+                            if 'historia_bitew' not in self.units[side_name][unit_id]:
+                                self.units[side_name][unit_id]['historia_bitew'] = []
+                            self.units[side_name][unit_id]['historia_bitew'].append(unit_battle_info)
                             break
         
         # Zbierz wszystkie jednostki strony 2 (participating + wybrane normalnie)
         all_side2_units = list(self.participating_units["strona2"])
         if self.selected_unit_side2 and self.unit_side2_type != "brak":
             # Dodaj jednostkę wybraną normalnie, jeśli nie jest już w participating
-            if not any(u['name'] == self.selected_unit_side2 for u in all_side2_units):
+            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side2 for u in all_side2_units):
                 all_side2_units.append({
-                    'name': self.selected_unit_side2,
-                    'people': self.dice2_people_original
+                    'id': self.selected_unit_side2,
+                    'name': self.selected_unit_side2,  # dla kompatybilności
+                    'people': self.dice2_people_original,
+                    'side': self.unit_side2_type
                 })
         
         # Historia dla jednostek strony 2
@@ -2686,16 +2732,16 @@ class DiceRollerApp:
                     unit_battle_info = battle_info_side2.copy()
                     unit_battle_info['straty'] = unit_losses
                     # Dodaj informacje specyficzne dla strony 2
-                    unit_battle_info['friendly_units'] = side2_units
-                    unit_battle_info['enemy_units'] = side1_units
+                    unit_battle_info['friendly_units'] = side2_display_names
+                    unit_battle_info['enemy_units'] = side1_display_names
                     
                     # Dodaj do historii jednostki
-                    unit_name = unit['name']
+                    unit_id = unit.get('id', unit.get('name', ''))
                     for side_name in ['własne', 'wroga']:
-                        if unit_name in self.units[side_name]:
-                            if 'historia_bitew' not in self.units[side_name][unit_name]:
-                                self.units[side_name][unit_name]['historia_bitew'] = []
-                            self.units[side_name][unit_name]['historia_bitew'].append(unit_battle_info)
+                        if unit_id in self.units[side_name]:
+                            if 'historia_bitew' not in self.units[side_name][unit_id]:
+                                self.units[side_name][unit_id]['historia_bitew'] = []
+                            self.units[side_name][unit_id]['historia_bitew'].append(unit_battle_info)
                             break
     
     def show_unit_battle_history(self, unit_data):
