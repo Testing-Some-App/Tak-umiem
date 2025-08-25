@@ -1803,7 +1803,7 @@ class DiceRollerApp:
         # Dla exp == 0 nie dodawać nic
         
         # Formatting zgodnie z wymaganiami
-        export_text = f"Doświadczenie = {exp_text} W{unit_data['liczba_zwycięstw']} U{unit_data['liczba_uzupełnień']}\n"
+        export_text = f"Doświadczenie = {exp_text} Wx{unit_data['liczba_zwycięstw']} Ux{unit_data['liczba_uzupełnień']}\n"
         export_text += f"Ludzie = {unit_data['liczba_ludzi']}/150\n"
         export_text += f"Zapasy = {unit_data['zapasy']}/3"
         
