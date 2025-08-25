@@ -1827,10 +1827,8 @@ class DiceRollerApp:
         
         self.show_unit_details()
         
-        # Wyczyszczenie pól
-        self.new_unit_number_var.set("")
-        self.new_unit_battalion_var.set("")
-        self.update_next_unit_number()
+        # Automatyczne zwiększenie numeru dla następnej jednostki (zachowaj batalion)
+        self.new_unit_number_var.set(str(unit_number + 1))
         
         messagebox.showinfo("Sukces", f"Utworzono jednostkę: {display_name}")
     
