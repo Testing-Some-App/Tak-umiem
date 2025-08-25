@@ -455,17 +455,21 @@ class DiceRollerApp:
         self.tactical_result_label.grid(row=4, column=0, columnspan=3, pady=(10, 5))
         
         
+        # Frame dla przycisków
+        buttons_frame = ttk.Frame(self.game_frame)
+        buttons_frame.grid(row=5, column=0, columnspan=3, pady=(5, 10))
+        
         # Przycisk Reset jednostek uczestniczących
-        ttk.Button(self.game_frame, text="Reset jednostek", command=self.reset_participating_units).grid(row=5, column=0, columnspan=3, pady=(5, 5))
+        ttk.Button(buttons_frame, text="Reset jednostek", command=self.reset_participating_units).pack(pady=(0, 5))
         
         # Przycisk do generowania wyniku
         self.roll_button = ttk.Button(
-            self.game_frame,
+            buttons_frame,
             text="Wynik",
             command=self.roll_dice,
             style="Roll.TButton"
         )
-        self.roll_button.grid(row=6, column=0, columnspan=3, pady=(5, 20))
+        self.roll_button.pack(pady=(5, 0))
         
         # Stylizacja przycisków
         style = ttk.Style()
@@ -1718,7 +1722,11 @@ class DiceRollerApp:
                 # Automatyczne wypełnienie danych z jednostki
                 unit_data = self.units[self.unit_side1_type][unit_name]
                 self.dice1_exp_var.set(unit_data["doświadczenie"])
-                self.dice1_people_var.set(str(unit_data["liczba_ludzi"]))
+                
+                # Ustaw liczbę ludzi tylko jeśli nie ma jednostek uczestniczących
+                if not self.participating_units["strona1"]:
+                    self.dice1_people_var.set(str(unit_data["liczba_ludzi"]))
+                
                 self.update_exp_bonuses_display()
         
         # Strona 2
@@ -1729,7 +1737,11 @@ class DiceRollerApp:
                 # Automatyczne wypełnienie danych z jednostki
                 unit_data = self.units[self.unit_side2_type][unit_name]
                 self.dice2_exp_var.set(unit_data["doświadczenie"])
-                self.dice2_people_var.set(str(unit_data["liczba_ludzi"]))
+                
+                # Ustaw liczbę ludzi tylko jeśli nie ma jednostek uczestniczących
+                if not self.participating_units["strona2"]:
+                    self.dice2_people_var.set(str(unit_data["liczba_ludzi"]))
+                
                 self.update_exp_bonuses_display()
     
     def update_battle_units_combos(self):
