@@ -332,6 +332,9 @@ class DiceRollerApp:
         self.unit_side1_combo.grid(row=2, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(5, 0))
         self.unit_side1_combo.bind("<<ComboboxSelected>>", self.on_battle_unit_selected)
         
+        # Przycisk "Dodaj więcej" dla strony 1
+        ttk.Button(side1_unit_frame, text="Dodaj więcej", command=lambda: self.add_more_units_side(1)).grid(row=3, column=0, columnspan=3, pady=(5, 0))
+        
         # Strona 2 - wybór jednostki
         side2_unit_frame = ttk.Frame(units_selection_frame)
         side2_unit_frame.grid(row=0, column=2, sticky=tk.W, padx=(20, 0))
@@ -346,6 +349,9 @@ class DiceRollerApp:
         self.unit_side2_combo = ttk.Combobox(side2_unit_frame, textvariable=self.unit_side2_var, values=[], state="readonly", width=15)
         self.unit_side2_combo.grid(row=2, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(5, 0))
         self.unit_side2_combo.bind("<<ComboboxSelected>>", self.on_battle_unit_selected)
+        
+        # Przycisk "Dodaj więcej" dla strony 2
+        ttk.Button(side2_unit_frame, text="Dodaj więcej", command=lambda: self.add_more_units_side(2)).grid(row=3, column=0, columnspan=3, pady=(5, 0))
         
         # Separator pionowy
         separator_units = ttk.Separator(units_selection_frame, orient='vertical')
@@ -448,12 +454,9 @@ class DiceRollerApp:
         )
         self.tactical_result_label.grid(row=4, column=0, columnspan=3, pady=(10, 5))
         
-        # Przyciski "Dodaj więcej" i "Reset"
-        buttons_frame = ttk.Frame(self.game_frame)
-        buttons_frame.grid(row=5, column=0, columnspan=3, pady=(5, 5))
         
-        ttk.Button(buttons_frame, text="Dodaj więcej", command=self.add_more_units).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(buttons_frame, text="Reset", command=self.reset_participating_units).pack(side=tk.LEFT, padx=(5, 0))
+        # Przycisk Reset jednostek uczestniczących
+        ttk.Button(self.game_frame, text="Reset jednostek", command=self.reset_participating_units).grid(row=5, column=0, columnspan=3, pady=(5, 5))
         
         # Przycisk do generowania wyniku
         self.roll_button = ttk.Button(
@@ -846,6 +849,9 @@ class DiceRollerApp:
         # Aktualizacja ikon doświadczenia
         self.dice1_exp_icon.config(text="⭐ Zwycięstwo" if self.dice1_gets_exp else "")
         self.dice2_exp_icon.config(text="⭐ Zwycięstwo" if self.dice2_gets_exp else "")
+        
+        # Rozdzielenie strat między jednostkami uczestniczącymi
+        self.distribute_losses_among_units()
         
         # Aktualizacja statystyk jednostek po rzucie
         self.update_unit_stats_after_battle(dice1_final, dice2_final)
@@ -1808,52 +1814,125 @@ class DiceRollerApp:
         # Aktualizacja comboboxów wyboru jednostek do bitwy
         self.update_battle_units_combos()
     
-    def add_more_units(self):
-        """Dodaje jednostki do udziału w bitwie"""
-        # Sprawdź czy są wybrane jednostki
-        unit1_selected = self.unit_side1_type != "brak" and hasattr(self, 'selected_unit_side1') and self.selected_unit_side1
-        unit2_selected = self.unit_side2_type != "brak" and hasattr(self, 'selected_unit_side2') and self.selected_unit_side2
+    def distribute_losses_among_units(self):
+        """Rozdziela straty między jednostkami uczestniczącymi w bitwie"""
+        # Straty strony 1
+        if self.participating_units["strona1"]:
+            total_losses_side1 = self.dice1_people_original - self.dice1_people_result
+            if total_losses_side1 > 0:
+                losses_per_unit = total_losses_side1 // len(self.participating_units["strona1"])
+                remainder = total_losses_side1 % len(self.participating_units["strona1"])
+                
+                for i, unit in enumerate(self.participating_units["strona1"]):
+                    losses = losses_per_unit
+                    if i < remainder:  # Rozdziel resztę między pierwsze jednostki
+                        losses += 1
+                    
+                    # Odejmij straty od jednostki
+                    unit['people'] = max(0, unit['people'] - losses)
+                    
+                    # Zaktualizuj jednostkę w głównym słowniku
+                    unit_name = unit['name']
+                    for side_name in ['własne', 'wroga']:
+                        if unit_name in self.units[side_name]:
+                            self.units[side_name][unit_name]['liczba_ludzi'] = unit['people']
+                            break
         
-        if not unit1_selected and not unit2_selected:
-            messagebox.showwarning("Błąd", "Wybierz przynajmniej jedną jednostkę!")
-            return
-        
-        # Dodaj jednostki do listy uczestniczących
-        if unit1_selected:
+        # Straty strony 2
+        if self.participating_units["strona2"]:
+            total_losses_side2 = self.dice2_people_original - self.dice2_people_result
+            if total_losses_side2 > 0:
+                losses_per_unit = total_losses_side2 // len(self.participating_units["strona2"])
+                remainder = total_losses_side2 % len(self.participating_units["strona2"])
+                
+                for i, unit in enumerate(self.participating_units["strona2"]):
+                    losses = losses_per_unit
+                    if i < remainder:  # Rozdziel resztę między pierwsze jednostki
+                        losses += 1
+                    
+                    # Odejmij straty od jednostki
+                    unit['people'] = max(0, unit['people'] - losses)
+                    
+                    # Zaktualizuj jednostkę w głównym słowniku
+                    unit_name = unit['name']
+                    for side_name in ['własne', 'wroga']:
+                        if unit_name in self.units[side_name]:
+                            self.units[side_name][unit_name]['liczba_ludzi'] = unit['people']
+                            break
+    
+    def add_more_units_side(self, side_number):
+        """Dodaje jednostkę do udziału w bitwie dla określonej strony"""
+        if side_number == 1:
+            # Strona 1
+            if self.unit_side1_type == "brak" or not hasattr(self, 'selected_unit_side1') or not self.selected_unit_side1:
+                messagebox.showwarning("Błąd", "Wybierz jednostkę dla strony 1!")
+                return
+            
             unit_info = {
                 'name': self.selected_unit_side1,
                 'people': int(self.dice1_people_var.get() or "0")
             }
+            
             # Sprawdź czy jednostka już nie uczestniczy
             existing = [u for u in self.participating_units["strona1"] if u['name'] == unit_info['name']]
-            if not existing:
-                self.participating_units["strona1"].append(unit_info)
-        
-        if unit2_selected:
+            if existing:
+                messagebox.showwarning("Błąd", "Ta jednostka już uczestniczy w bitwie!")
+                return
+            
+            # Dodaj jednostkę
+            self.participating_units["strona1"].append(unit_info)
+            
+            # Zwiększ liczbę ludzi w polu
+            current_people = int(self.dice1_people_var.get() or "0")
+            new_total = current_people + unit_info['people']
+            self.dice1_people_var.set(str(new_total))
+            
+            # Reset modyfikatorów dla strony 1
+            self.dice1_exp_var.set(0)
+            
+            # Wyczyść wybór jednostki dla strony 1
+            self.unit_side1_var.set("")
+            self.selected_unit_side1 = None
+            
+            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 1! (Nowa liczba ludzi: {new_total})")
+            
+        elif side_number == 2:
+            # Strona 2
+            if self.unit_side2_type == "brak" or not hasattr(self, 'selected_unit_side2') or not self.selected_unit_side2:
+                messagebox.showwarning("Błąd", "Wybierz jednostkę dla strony 2!")
+                return
+            
             unit_info = {
                 'name': self.selected_unit_side2,
                 'people': int(self.dice2_people_var.get() or "0")
             }
+            
             # Sprawdź czy jednostka już nie uczestniczy
             existing = [u for u in self.participating_units["strona2"] if u['name'] == unit_info['name']]
-            if not existing:
-                self.participating_units["strona2"].append(unit_info)
-        
-        # Reset modyfikatorów (oprócz liczby ludzi)
-        self.dice1_exp_var.set(0)
-        self.dice2_exp_var.set(0)
-        
-        # Wyczyść wybory jednostek
-        self.unit_side1_var.set("")
-        self.unit_side2_var.set("")
-        self.selected_unit_side1 = None
-        self.selected_unit_side2 = None
+            if existing:
+                messagebox.showwarning("Błąd", "Ta jednostka już uczestniczy w bitwie!")
+                return
+            
+            # Dodaj jednostkę
+            self.participating_units["strona2"].append(unit_info)
+            
+            # Zwiększ liczbę ludzi w polu
+            current_people = int(self.dice2_people_var.get() or "0")
+            new_total = current_people + unit_info['people']
+            self.dice2_people_var.set(str(new_total))
+            
+            # Reset modyfikatorów dla strony 2
+            self.dice2_exp_var.set(0)
+            
+            # Wyczyść wybór jednostki dla strony 2
+            self.unit_side2_var.set("")
+            self.selected_unit_side2 = None
+            
+            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 2! (Nowa liczba ludzi: {new_total})")
         
         # Aktualizuj wyświetlanie
         self.update_units_display()
         self.update_exp_bonuses_display()
-        
-        messagebox.showinfo("Sukces", "Jednostki dodane do bitwy!")
     
     def reset_participating_units(self):
         """Resetuje jednostki biorące udział w bitwie"""
