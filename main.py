@@ -11,6 +11,7 @@ from tkinter import scrolledtext
 from tkinter import filedialog, messagebox
 import random
 import json
+import string
 from datetime import datetime
 
 
@@ -47,9 +48,16 @@ class DiceRollerApp:
         self.battle_names = ["Niezapisana"]  # Lista nazw bitew dla combobox
         
         # System jednostek
-        self.units = {"własne": {}, "wroga": {}}  # Słownik jednostek: {"własne": {nazwa: dane}, "wroga": {nazwa: dane}}
-        self.current_unit = None  # Obecnie wybrana jednostka
+        self.units = {"własne": {}, "wroga": {}}  # Słownik jednostek: {"własne": {id: dane}, "wroga": {id: dane}}
+        self.current_unit = None  # Obecnie wybrana jednostka (ID)
         self.current_unit_side = "własne"  # Strona obecnie wybranej jednostki
+        
+        # System batalionów
+        self.battalions = {}  # Słownik batalionów: {id: {"nazwa": string, "id": string}}
+        self.current_battalion = None  # Obecnie wybrany batalion (ID)
+        
+        # Liczniki numeracji jednostek
+        self.next_unit_number = {"własne": 1, "wroga": 1}
         
         # Jednostki biorące udział w bitwie
         self.participating_units = {"strona1": [], "strona2": []}  # Lista jednostek na każdej stronie
@@ -57,8 +65,8 @@ class DiceRollerApp:
         self.side2_locked = False  # Czy strona 2 ma zablokowane automatyczne uzupełnianie
         
         # Jednostki wybrane do bitwy
-        self.selected_unit_side1 = None  # Nazwa wybranej jednostki dla strony 1
-        self.selected_unit_side2 = None  # Nazwa wybranej jednostki dla strony 2
+        self.selected_unit_side1 = None  # ID wybranej jednostki dla strony 1
+        self.selected_unit_side2 = None  # ID wybranej jednostki dla strony 2
         self.unit_side1_type = "brak"  # "własne", "wroga", "brak"
         self.unit_side2_type = "brak"  # "własne", "wroga", "brak"
         
@@ -79,6 +87,151 @@ class DiceRollerApp:
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
+    
+    def generate_random_id(self):
+        """Generuje losowy 5-znakowy identyfikator"""
+        return ''.join(random.choices(string.ascii_letters + string.digits, k=5))
+    
+    def get_unit_display_name(self, unit_id, side):
+        """Zwraca sformatowaną nazwę jednostki do wyświetlania"""
+        if unit_id not in self.units[side]:
+            return "Nieznana jednostka"
+        
+        unit_data = self.units[side][unit_id]
+        number = unit_data.get('numer', 1)
+        unit_type = unit_data.get('typ', 'kompania')
+        battalion_id = unit_data.get('batalion', None)
+        
+        # Formatowanie typu jednostki
+        type_suffix = "Komp." if unit_type == "kompania" else "Grupa"
+        
+        # Formatowanie batalionu
+        battalion_part = ""
+        if battalion_id and battalion_id in self.battalions:
+            battalion_name = self.battalions[battalion_id]['nazwa']
+            battalion_part = f" Bat. {battalion_name}"
+        
+        return f"{number} {type_suffix}{battalion_part}"
+    
+    def get_battalion_display_name(self, battalion_id):
+        """Zwraca nazwę batalionu do wyświetlania"""
+        if battalion_id not in self.battalions:
+            return "Nieznany batalion"
+        return self.battalions[battalion_id]['nazwa']
+    
+    def create_new_battalion(self):
+        """Tworzy nowy batalion"""
+        battalion_name = self.new_battalion_var.get().strip()
+        if not battalion_name:
+            messagebox.showwarning("Błąd", "Wprowadź nazwę batalionu!")
+            return
+        
+        # Sprawdź czy batalion o tej nazwie już istnieje
+        for battalion_id, data in self.battalions.items():
+            if data['nazwa'] == battalion_name:
+                messagebox.showwarning("Błąd", "Batalion o tej nazwie już istnieje!")
+                return
+        
+        # Stwórz nowy batalion
+        battalion_id = self.generate_random_id()
+        self.battalions[battalion_id] = {
+            'nazwa': battalion_name,
+            'id': battalion_id
+        }
+        
+        # Aktualizacja interfejsu
+        self.update_battalion_combos()
+        self.new_battalion_var.set("")
+        
+        messagebox.showinfo("Sukces", f"Batalion '{battalion_name}' został utworzony!")
+    
+    def on_battalion_selected(self, event=None):
+        """Obsługuje wybór batalionu"""
+        battalion_name = self.battalion_var.get()
+        if not battalion_name:
+            self.battalion_info_label.config(text="")
+            return
+        
+        # Znajdź batalion po nazwie
+        battalion_id = None
+        for bid, data in self.battalions.items():
+            if data['nazwa'] == battalion_name:
+                battalion_id = bid
+                break
+        
+        if not battalion_id:
+            self.battalion_info_label.config(text="")
+            return
+        
+        # Policz jednostki i ludzi w batalionie
+        unit_count = 0
+        total_people = 0
+        
+        for side in ['własne', 'wroga']:
+            for unit_id, unit_data in self.units[side].items():
+                if unit_data.get('batalion') == battalion_id:
+                    unit_count += 1
+                    total_people += unit_data.get('liczba_ludzi', 0)
+        
+        self.battalion_info_label.config(text=f"Jednostek: {unit_count}, Ludzi: {total_people}")
+    
+    def update_battalion_combos(self):
+        """Aktualizuje comboboxi batalionów"""
+        battalion_names = [data['nazwa'] for data in self.battalions.values()]
+        self.battalion_combo.config(values=battalion_names)
+        self.new_unit_battalion_combo.config(values=[''] + battalion_names)
+    
+    def update_next_unit_number(self):
+        """Aktualizuje następny numer jednostki dla wybranej strony"""
+        side = self.new_unit_side_var.get()
+        next_number = self.next_unit_number[side]
+        self.new_unit_number_var.set(str(next_number))
+    
+    def migrate_old_units(self):
+        """Migruje stare jednostki (z nazwami jako klucze) do nowego formatu z ID"""
+        units_to_migrate = {}
+        
+        for side in ['własne', 'wroga']:
+            units_to_migrate[side] = []
+            
+            for unit_key, unit_data in list(self.units[side].items()):
+                # Sprawdź czy to stara jednostka (bez pola 'id')
+                if 'id' not in unit_data:
+                    # To stara jednostka - przygotuj do migracji
+                    new_unit_id = self.generate_random_id()
+                    
+                    # Utwórz nowe dane jednostki
+                    new_unit_data = {
+                        "id": new_unit_id,
+                        "numer": self.next_unit_number[side],
+                        "typ": "kompania",  # domyślnie kompania
+                        "batalion": None,   # brak batalionu
+                        "liczba_ludzi": unit_data.get("liczba_ludzi", 150),
+                        "doświadczenie": unit_data.get("doświadczenie", 0),
+                        "zapasy": unit_data.get("zapasy", 3),
+                        "liczba_zwycięstw": unit_data.get("liczba_zwycięstw", 0),
+                        "liczba_uzupełnień": unit_data.get("liczba_uzupełnień", 0),
+                        "strona": side,
+                        "historia_bitew": unit_data.get("historia_bitew", []),
+                        # Zachowaj starą nazwę jako backup
+                        "_legacy_name": unit_key
+                    }
+                    
+                    units_to_migrate[side].append((unit_key, new_unit_id, new_unit_data))
+                    self.next_unit_number[side] += 1
+        
+        # Wykonaj migrację
+        for side in ['własne', 'wroga']:
+            for old_key, new_id, new_data in units_to_migrate[side]:
+                # Usuń starą jednostkę
+                del self.units[side][old_key]
+                # Dodaj nową jednostkę z ID
+                self.units[side][new_id] = new_data
+        
+        # Aktualizuj interfejs jeśli były migracje
+        total_migrated = sum(len(units_to_migrate[side]) for side in ['własne', 'wroga'])
+        if total_migrated > 0:
+            print(f"Zmigrowano {total_migrated} jednostek do nowego formatu")
     
     def create_widgets(self):
         """Tworzy wszystkie elementy interfejsu"""
@@ -212,29 +365,81 @@ class DiceRollerApp:
         self.enemy_units_combo.grid(row=4, column=0, sticky=tk.W+tk.E, pady=(2, 5))
         self.enemy_units_combo.bind("<<ComboboxSelected>>", lambda e: self.on_unit_selected("wroga"))
         
+        # === BATALIONY ===
+        battalions_frame = ttk.LabelFrame(units_frame, text="Bataliony", padding="5")
+        battalions_frame.grid(row=2, column=0, sticky=tk.W+tk.E, pady=(10, 10))
+        
+        # Wybór batalionu
+        ttk.Label(battalions_frame, text="Batalion:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W)
+        self.battalion_var = tk.StringVar()
+        self.battalion_combo = ttk.Combobox(battalions_frame, textvariable=self.battalion_var, 
+                                           values=[], state="readonly", width=15)
+        self.battalion_combo.grid(row=1, column=0, sticky=tk.W+tk.E, pady=(2, 5))
+        self.battalion_combo.bind("<<ComboboxSelected>>", self.on_battalion_selected)
+        
+        # Informacje o batalionie
+        self.battalion_info_label = ttk.Label(battalions_frame, text="", font=("Arial", 8), 
+                                             foreground="blue")
+        self.battalion_info_label.grid(row=2, column=0, sticky=tk.W, pady=(0, 5))
+        
+        # Tworzenie nowego batalionu
+        new_battalion_frame = ttk.Frame(battalions_frame)
+        new_battalion_frame.grid(row=3, column=0, sticky=tk.W+tk.E, pady=(5, 0))
+        
+        self.new_battalion_var = tk.StringVar()
+        self.new_battalion_entry = ttk.Entry(new_battalion_frame, textvariable=self.new_battalion_var, width=10)
+        self.new_battalion_entry.grid(row=0, column=0, sticky=tk.W+tk.E)
+        
+        ttk.Button(new_battalion_frame, text="+", command=self.create_new_battalion, width=3).grid(row=0, column=1, padx=(5, 0))
+        
         # Stwórz jednostkę
         create_unit_frame = ttk.Frame(units_frame)
-        create_unit_frame.grid(row=2, column=0, sticky=tk.W+tk.E, pady=(10, 10))
+        create_unit_frame.grid(row=3, column=0, sticky=tk.W+tk.E, pady=(10, 10))
         
         ttk.Label(create_unit_frame, text="Stwórz jednostkę:", font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, columnspan=2)
         
-        self.new_unit_name_var = tk.StringVar()
-        self.new_unit_name_entry = ttk.Entry(create_unit_frame, textvariable=self.new_unit_name_var, width=15)
-        self.new_unit_name_entry.grid(row=1, column=0, sticky=tk.W+tk.E, pady=(5, 0))
+        # Numer jednostki
+        ttk.Label(create_unit_frame, text="Numer:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
+        self.new_unit_number_var = tk.StringVar()
+        self.new_unit_number_entry = ttk.Entry(create_unit_frame, textvariable=self.new_unit_number_var, width=8)
+        self.new_unit_number_entry.grid(row=1, column=1, sticky=tk.W, pady=(5, 0))
+        
+        # Typ jednostki
+        ttk.Label(create_unit_frame, text="Typ:", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=(5, 0))
+        self.new_unit_type_var = tk.StringVar(value="kompania")
+        unit_type_frame = ttk.Frame(create_unit_frame)
+        unit_type_frame.grid(row=2, column=1, sticky=tk.W, pady=(5, 0))
+        ttk.Radiobutton(unit_type_frame, text="Kompania", variable=self.new_unit_type_var, value="kompania").grid(row=0, column=0)
+        ttk.Radiobutton(unit_type_frame, text="Grupa", variable=self.new_unit_type_var, value="grupa").grid(row=0, column=1, padx=(10, 0))
+        
+        # Batalion
+        ttk.Label(create_unit_frame, text="Batalion:", font=("Arial", 9)).grid(row=3, column=0, sticky=tk.W, pady=(5, 0))
+        self.new_unit_battalion_var = tk.StringVar()
+        self.new_unit_battalion_combo = ttk.Combobox(create_unit_frame, textvariable=self.new_unit_battalion_var, 
+                                                    values=[], state="readonly", width=12)
+        self.new_unit_battalion_combo.grid(row=3, column=1, sticky=tk.W, pady=(5, 0))
         
         # Przyciski wyboru strony dla nowej jednostki
         create_buttons_frame = ttk.Frame(create_unit_frame)
-        create_buttons_frame.grid(row=2, column=0, columnspan=2, pady=(5, 0))
+        create_buttons_frame.grid(row=4, column=0, columnspan=2, pady=(5, 0))
         
         self.new_unit_side_var = tk.StringVar(value="własne")
         ttk.Radiobutton(create_buttons_frame, text="Swoje", variable=self.new_unit_side_var, value="własne").grid(row=0, column=0, padx=(0, 10))
         ttk.Radiobutton(create_buttons_frame, text="Wróg", variable=self.new_unit_side_var, value="wroga").grid(row=0, column=1, padx=(10, 0))
         
-        ttk.Button(create_unit_frame, text="Stwórz", command=self.create_new_unit).grid(row=3, column=0, columnspan=2, pady=(5, 0))
+        ttk.Button(create_unit_frame, text="Stwórz", command=self.create_new_unit).grid(row=5, column=0, columnspan=2, pady=(5, 0))
         
         # Frame dla szczegółów jednostki (początkowo ukryty)
         self.unit_details_frame = ttk.LabelFrame(units_frame, text="Szczegóły jednostki", padding="10")
         # Nie gridujemy go na początku - pojawi się po wybraniu jednostki
+        
+        # Migracja starych jednostek do nowego formatu
+        self.migrate_old_units()
+        
+        # Inicjalizacja comboboxów dla batalionów i automat. numer
+        self.update_battalion_combos()
+        self.new_unit_side_var.trace('w', lambda *args: self.update_next_unit_number())
+        self.update_next_unit_number()
         
         # Bind scroll wheel to canvas for both vertical and horizontal scrolling
         def _on_mousewheel(event):
@@ -1507,77 +1712,116 @@ class DiceRollerApp:
     
     def create_new_unit(self):
         """Tworzy nową jednostkę"""
-        unit_name = self.new_unit_name_var.get().strip()
-        if not unit_name:
-            messagebox.showwarning("Błąd", "Wprowadź nazwę jednostki!")
-            return
-        
-        # Sprawdzenie czy jednostka już istnieje
-        if (unit_name in self.units["własne"] or unit_name in self.units["wroga"]):
-            messagebox.showwarning("Błąd", "Jednostka o tej nazwie już istnieje!")
-            return
-        
         # Pobranie wybranej strony z przycisków radio
         side = self.new_unit_side_var.get()
         
-        # Tworzenie nowej jednostki z domyślnymi wartościami
+        # Pobranie numeru jednostki
+        try:
+            unit_number = int(self.new_unit_number_var.get() or self.next_unit_number[side])
+        except ValueError:
+            messagebox.showwarning("Błąd", "Numer jednostki musi być liczbą!")
+            return
+        
+        # Sprawdzenie czy jednostka o tym numerze już istnieje
+        for unit_id, unit_data in self.units[side].items():
+            if unit_data.get('numer', 1) == unit_number:
+                messagebox.showwarning("Błąd", f"Jednostka o numerze {unit_number} już istnieje na stronie {side}!")
+                return
+        
+        # Pobranie typu jednostki
+        unit_type = self.new_unit_type_var.get()
+        
+        # Pobranie batalionu (jeśli wybrano)
+        battalion_name = self.new_unit_battalion_var.get()
+        battalion_id = None
+        if battalion_name:
+            for bid, data in self.battalions.items():
+                if data['nazwa'] == battalion_name:
+                    battalion_id = bid
+                    break
+        
+        # Generowanie ID jednostki
+        unit_id = self.generate_random_id()
+        
+        # Tworzenie nowej jednostki z nowymi polami
         unit_data = {
-            "nazwa": unit_name,
+            "id": unit_id,
+            "numer": unit_number,
+            "typ": unit_type,
+            "batalion": battalion_id,
             "liczba_ludzi": 150,
             "doświadczenie": 0,
             "zapasy": 3,
             "liczba_zwycięstw": 0,
             "liczba_uzupełnień": 0,
-            "strona": side,  # Pole strony według wyboru
-            "historia_bitew": []  # Historia udziału w bitwach
+            "strona": side,
+            "historia_bitew": []
         }
         
         # Dodanie jednostki
-        self.units[side][unit_name] = unit_data
+        self.units[side][unit_id] = unit_data
+        
+        # Aktualizacja następnego numeru
+        if unit_number >= self.next_unit_number[side]:
+            self.next_unit_number[side] = unit_number + 1
         
         # Aktualizacja interfejsu
         self.update_units_combos()
         
         # Automatyczne wybranie utworzonej jednostki
-        self.current_unit = unit_name
+        self.current_unit = unit_id
         self.current_unit_side = side
+        display_name = self.get_unit_display_name(unit_id, side)
         if side == "własne":
-            self.own_units_var.set(unit_name)
+            self.own_units_var.set(display_name)
             self.enemy_units_var.set("")
         else:
-            self.enemy_units_var.set(unit_name)
+            self.enemy_units_var.set(display_name)
             self.own_units_var.set("")
         
         self.show_unit_details()
         
-        # Wyczyszczenie pola nazwy
-        self.new_unit_name_var.set("")
+        # Wyczyszczenie pól
+        self.new_unit_number_var.set("")
+        self.new_unit_battalion_var.set("")
+        self.update_next_unit_number()
         
-        messagebox.showinfo("Sukces", f"Utworzono jednostkę: {unit_name} ({side})")
+        messagebox.showinfo("Sukces", f"Utworzono jednostkę: {display_name}")
     
     def on_unit_selected(self, side):
         """Obsługuje wybór jednostki"""
         if side == "własne":
-            unit_name = self.own_units_var.get()
+            display_name = self.own_units_var.get()
             self.enemy_units_var.set("")  # Wyczyść drugą stronę
         else:
-            unit_name = self.enemy_units_var.get()
+            display_name = self.enemy_units_var.get()
             self.own_units_var.set("")  # Wyczyść drugą stronę
         
-        if unit_name and unit_name in self.units[side]:
-            self.current_unit = unit_name
-            self.current_unit_side = side
-            self.show_unit_details()
+        if display_name:
+            # Znajdź unit_id na podstawie nazwy wyświetlanej
+            unit_id = None
+            for uid, unit_data in self.units[side].items():
+                if self.get_unit_display_name(uid, side) == display_name:
+                    unit_id = uid
+                    break
+            
+            if unit_id:
+                self.current_unit = unit_id
+                self.current_unit_side = side
+                self.show_unit_details()
+            else:
+                self.hide_unit_details()
         else:
             self.hide_unit_details()
     
     def update_units_combos(self):
         """Aktualizuje zawartość comboboxów jednostek"""
-        own_units = list(self.units["własne"].keys())
-        enemy_units = list(self.units["wroga"].keys())
+        # Twórz listy nazw do wyświetlania
+        own_units_display = [self.get_unit_display_name(unit_id, "własne") for unit_id in self.units["własne"].keys()]
+        enemy_units_display = [self.get_unit_display_name(unit_id, "wroga") for unit_id in self.units["wroga"].keys()]
         
-        self.own_units_combo.config(values=own_units)
-        self.enemy_units_combo.config(values=enemy_units)
+        self.own_units_combo.config(values=own_units_display)
+        self.enemy_units_combo.config(values=enemy_units_display)
     
     def show_unit_details(self):
         """Pokazuje szczegóły wybranej jednostki"""
@@ -1591,7 +1835,8 @@ class DiceRollerApp:
         self.unit_details_frame.grid(row=3, column=0, sticky=tk.W+tk.E+tk.N+tk.S, pady=(10, 0))
         
         # Uaktualnij tytuł
-        self.unit_details_frame.config(text=f"Szczegóły: {self.current_unit} ({self.current_unit_side})")
+        display_name = self.get_unit_display_name(self.current_unit, self.current_unit_side)
+        self.unit_details_frame.config(text=f"Szczegóły: {display_name} ({self.current_unit_side})")
         
         # Usuń poprzednie contentery jeśli istnieją
         for widget in self.unit_details_frame.winfo_children():
@@ -1599,13 +1844,36 @@ class DiceRollerApp:
         
         unit_data = self.units[self.current_unit_side][self.current_unit]
         
-        # Nazwa
+        # Numer jednostki
         row = 0
-        ttk.Label(self.unit_details_frame, text="Nazwa:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
-        self.unit_name_var = tk.StringVar(value=unit_data["nazwa"])
-        self.unit_name_entry = ttk.Entry(self.unit_details_frame, textvariable=self.unit_name_var, width=15)
-        self.unit_name_entry.grid(row=row, column=1, sticky=tk.W+tk.E, padx=(0, 5))
-        self.unit_name_entry.bind('<KeyRelease>', self.on_unit_data_change)
+        ttk.Label(self.unit_details_frame, text="Numer:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5))
+        self.unit_number_var = tk.StringVar(value=str(unit_data.get("numer", 1)))
+        self.unit_number_entry = ttk.Entry(self.unit_details_frame, textvariable=self.unit_number_var, width=8)
+        self.unit_number_entry.grid(row=row, column=1, sticky=tk.W, padx=(0, 5))
+        self.unit_number_entry.bind('<KeyRelease>', self.on_unit_data_change)
+        
+        # Typ jednostki
+        row += 1
+        ttk.Label(self.unit_details_frame, text="Typ:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.unit_type_var = tk.StringVar(value=unit_data.get("typ", "kompania"))
+        unit_type_detail_frame = ttk.Frame(self.unit_details_frame)
+        unit_type_detail_frame.grid(row=row, column=1, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        ttk.Radiobutton(unit_type_detail_frame, text="Komp.", variable=self.unit_type_var, value="kompania", command=self.on_unit_data_change).grid(row=0, column=0)
+        ttk.Radiobutton(unit_type_detail_frame, text="Grupa", variable=self.unit_type_var, value="grupa", command=self.on_unit_data_change).grid(row=0, column=1, padx=(10, 0))
+        
+        # Batalion
+        row += 1
+        ttk.Label(self.unit_details_frame, text="Batalion:", font=("Arial", 9)).grid(row=row, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        battalion_id = unit_data.get("batalion", None)
+        battalion_name = ""
+        if battalion_id and battalion_id in self.battalions:
+            battalion_name = self.battalions[battalion_id]['nazwa']
+        self.unit_battalion_var = tk.StringVar(value=battalion_name)
+        self.unit_battalion_combo = ttk.Combobox(self.unit_details_frame, textvariable=self.unit_battalion_var, 
+                                                values=[''] + [data['nazwa'] for data in self.battalions.values()], 
+                                                state="readonly", width=12)
+        self.unit_battalion_combo.grid(row=row, column=1, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        self.unit_battalion_combo.bind('<<ComboboxSelected>>', self.on_unit_data_change)
         
         
         # Liczba ludzi (format X/150)
