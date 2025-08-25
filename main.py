@@ -1705,6 +1705,7 @@ class DiceRollerApp:
             if filename:
                 data = {
                     "units": self.units,
+                    "battalions": self.battalions,
                     "saved_at": datetime.now().isoformat()
                 }
                 
@@ -1732,8 +1733,15 @@ class DiceRollerApp:
                     messagebox.showerror("Błąd", "Nieprawidłowy format pliku!")
                     return
                 
-                # Wczytanie danych
+                # Wczytanie danych jednostek
                 self.units = data["units"]
+                
+                # Wczytanie batalionów (jeśli są w pliku)
+                if "battalions" in data:
+                    self.battalions = data["battalions"]
+                else:
+                    # Dla starych plików bez batalionów
+                    self.battalions = {}
                 
                 # Upewnienie się o prawidłowej strukturze
                 if "własne" not in self.units:
@@ -1747,9 +1755,11 @@ class DiceRollerApp:
                         if "historia_bitew" not in unit_data:
                             unit_data["historia_bitew"] = []
                 
-                # Aktualizacja interfejsu
+                # Migracja starych jednostek i aktualizacja interfejsu
+                self.migrate_old_units()
                 self.update_units_combos()
                 self.update_battle_units_combos()
+                self.update_battalion_combos()
                 self.hide_unit_details()
                 
                 messagebox.showinfo("Sukces", f"Wykaz jednostek wczytany z: {filename}")
