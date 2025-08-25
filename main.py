@@ -365,13 +365,14 @@ class DiceRollerApp:
         
         # Mały przycisk reset po lewej stronie
         reset_button = ttk.Button(results_container, text="R", command=self.reset_participating_units, width=2)
-        reset_button.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        reset_button.grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
         
-        # Frame dla wyników kości (horizontal layout)
+        # Frame dla wyników kości (horizontal layout) - wycentrowany
         dice_frame = ttk.LabelFrame(results_container, text="Wyniki", padding="15")
-        dice_frame.grid(row=0, column=1, sticky=tk.W+tk.E)
+        dice_frame.grid(row=0, column=1, sticky=tk.W+tk.E, padx=(15, 0))
         
         # Konfiguracja kolumn
+        results_container.columnconfigure(0, weight=0)
         results_container.columnconfigure(1, weight=1)
         
         # Pierwsza strona - liczba ludzi i nazwa
@@ -1098,7 +1099,16 @@ class DiceRollerApp:
     
     def add_to_history(self, dice1_final, dice2_final):
         """Dodaje wynik do historii"""
-        # Format: "Strona 1: X | Strona 2: Y | Ludzie: A->B | C->D"
+        # Zbierz informacje o jednostkach uczestniczących
+        side1_units = [u['name'] for u in self.participating_units["strona1"]]
+        side2_units = [u['name'] for u in self.participating_units["strona2"]]
+        
+        # Określ tryb walki
+        side1_attacking = getattr(self, 'side1_attack_var', tk.BooleanVar()).get()
+        side2_attacking = getattr(self, 'side2_attack_var', tk.BooleanVar()).get() 
+        side1_in_motion = getattr(self, 'side1_in_motion_var', tk.BooleanVar()).get()
+        side2_in_motion = getattr(self, 'side2_in_motion_var', tk.BooleanVar()).get()
+        
         history_entry = {
             'dice1': dice1_final,
             'dice2': dice2_final,
@@ -1108,8 +1118,12 @@ class DiceRollerApp:
             'people2_after': self.dice2_people_result,
             'exp1': self.dice1_gets_exp,
             'exp2': self.dice2_gets_exp,
-            'unit1_name': self.selected_unit_side1 if self.unit_side1_type != "brak" else None,
-            'unit2_name': self.selected_unit_side2 if self.unit_side2_type != "brak" else None
+            'side1_units': side1_units,
+            'side2_units': side2_units,
+            'side1_attacking': side1_attacking,
+            'side2_attacking': side2_attacking,
+            'side1_in_motion': side1_in_motion,
+            'side2_in_motion': side2_in_motion
         }
         
         # Dodanie do listy historii
@@ -1139,11 +1153,49 @@ class DiceRollerApp:
             exp1_icon = " ⭐" if entry['exp1'] else ""
             exp2_icon = " ⭐" if entry['exp2'] else ""
             
-            # Nazwy jednostek w historii
-            unit1_info = f" ({entry.get('unit1_name', '')})" if entry.get('unit1_name') else ""
-            unit2_info = f" ({entry.get('unit2_name', '')})" if entry.get('unit2_name') else ""
+            # Nowy format nazw w zależności od trybu i jednostek
+            side1_units = entry.get('side1_units', [])
+            side2_units = entry.get('side2_units', [])
             
-            history_line = f"#{i}: Strona 1: {entry['dice1']}{exp1_icon}{unit1_info} | Strona 2: {entry['dice2']}{exp2_icon}{unit2_info}\n"
+            # Określ format na podstawie jednostek i trybu
+            if side1_units and side2_units:
+                # Mamy jednostki po obu stronach
+                side1_in_motion = entry.get('side1_in_motion', False)
+                side2_in_motion = entry.get('side2_in_motion', False)
+                side1_attacking = entry.get('side1_attacking', False)
+                side2_attacking = entry.get('side2_attacking', False)
+                
+                # Formatuj nazwę jednostek (główna + dodatkowe po przecinku)
+                side1_name = side1_units[0]
+                if len(side1_units) > 1:
+                    side1_name += ", " + ", ".join(side1_units[1:])
+                    
+                side2_name = side2_units[0]
+                if len(side2_units) > 1:
+                    side2_name += ", " + ", ".join(side2_units[1:])
+                
+                if side1_in_motion or side2_in_motion:
+                    # W ruchu
+                    battle_desc = f"Bitwa \"{side1_name}\" z \"{side2_name}\""
+                elif side1_attacking:
+                    # Strona 1 atakuje
+                    battle_desc = f"Ofensywa \"{side1_name}\" na \"{side2_name}\""
+                elif side2_attacking:
+                    # Strona 2 atakuje
+                    battle_desc = f"Ofensywa \"{side2_name}\" na \"{side1_name}\""
+                else:
+                    # Domyślnie atak vs obrona
+                    battle_desc = f"Ofensywa \"{side1_name}\" na \"{side2_name}\""
+            else:
+                # Brak jednostek - format oryginalny
+                battle_desc = f"Strona 1: {entry['dice1']}{exp1_icon} | Strona 2: {entry['dice2']}{exp2_icon}"
+            
+            if side1_units and side2_units:
+                history_line = f"#{i}: {battle_desc}\n"
+                history_line += f"    Kostki: {entry['dice1']}{exp1_icon} vs {entry['dice2']}{exp2_icon}\n"
+            else:
+                history_line = f"#{i}: {battle_desc}\n"
+                
             history_line += f"    Ludzie: {entry['people1_before']}→{entry['people1_after']} | {entry['people2_before']}→{entry['people2_after']}\n\n"
             
             self.history_text.insert(tk.END, history_line)
@@ -1573,7 +1625,7 @@ class DiceRollerApp:
         
         ttk.Button(buttons_bottom_frame, text="Eksportuj dane", command=self.export_unit_data).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(buttons_bottom_frame, text="📋", command=lambda: self.show_unit_battle_history(unit_data), width=3).pack(side=tk.LEFT, padx=(5, 0))
-        ttk.Button(buttons_bottom_frame, text="Usuń", command=lambda: self.delete_unit(unit_data)).pack(side=tk.LEFT, padx=(5, 0))
+        ttk.Button(buttons_bottom_frame, text="🗑️", command=lambda: self.delete_unit(unit_data), width=3).pack(side=tk.LEFT, padx=(5, 0))
     
     def delete_unit(self, unit_data):
         """Usuwa jednostkę"""
