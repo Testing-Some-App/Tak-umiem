@@ -52,6 +52,10 @@ class DiceRollerApp:
         self.current_unit = None  # Obecnie wybrana jednostka (ID)
         self.current_unit_side = "własne"  # Strona obecnie wybranej jednostki
         
+        # Mapy ID->display name dla comboboxów bitwy
+        self.unit_side1_id_to_display = {}
+        self.unit_side2_id_to_display = {}
+        
         # System batalionów
         self.battalions = {}  # Słownik batalionów: {id: {"nazwa": string, "id": string}}
         self.current_battalion = None  # Obecnie wybrany batalion (ID)
@@ -1832,7 +1836,7 @@ class DiceRollerApp:
             return
         
         # Pokaż frame szczegółów
-        self.unit_details_frame.grid(row=3, column=0, sticky=tk.W+tk.E+tk.N+tk.S, pady=(10, 0))
+        self.unit_details_frame.grid(row=4, column=0, sticky=tk.W+tk.E+tk.N+tk.S, pady=(10, 0))
         
         # Uaktualnij tytuł
         display_name = self.get_unit_display_name(self.current_unit, self.current_unit_side)
@@ -2127,8 +2131,15 @@ class DiceRollerApp:
             self.unit_side1_var.set("")
             self.selected_unit_side1 = None
         else:
-            units_list = list(self.units[unit_type1].keys())
-            self.unit_side1_combo.config(values=units_list, state="readonly")
+            # Stwórz mapę ID -> sformatowana nazwa i lista sformatowanych nazw
+            units_display_names = []
+            self.unit_side1_id_to_display = {}
+            for unit_id in self.units[unit_type1].keys():
+                display_name = self.get_unit_display_name(unit_id, unit_type1)
+                units_display_names.append(display_name)
+                self.unit_side1_id_to_display[display_name] = unit_id
+            
+            self.unit_side1_combo.config(values=units_display_names, state="readonly")
             self.unit_side1_var.set("")
             self.selected_unit_side1 = None
         
@@ -2139,8 +2150,15 @@ class DiceRollerApp:
             self.unit_side2_var.set("")
             self.selected_unit_side2 = None
         else:
-            units_list = list(self.units[unit_type2].keys())
-            self.unit_side2_combo.config(values=units_list, state="readonly")
+            # Stwórz mapę ID -> sformatowana nazwa i lista sformatowanych nazw
+            units_display_names = []
+            self.unit_side2_id_to_display = {}
+            for unit_id in self.units[unit_type2].keys():
+                display_name = self.get_unit_display_name(unit_id, unit_type2)
+                units_display_names.append(display_name)
+                self.unit_side2_id_to_display[display_name] = unit_id
+            
+            self.unit_side2_combo.config(values=units_display_names, state="readonly")
             self.unit_side2_var.set("")
             self.selected_unit_side2 = None
         
@@ -2157,33 +2175,39 @@ class DiceRollerApp:
             
         # Strona 1
         if hasattr(event, 'widget') and event.widget == self.unit_side1_combo:
-            unit_name = self.unit_side1_var.get()
-            if unit_name and self.unit_side1_type != "brak":
-                self.selected_unit_side1 = unit_name
-                # Automatyczne wypełnienie danych z jednostki
-                unit_data = self.units[self.unit_side1_type][unit_name]
-                self.dice1_exp_var.set(unit_data["doświadczenie"])
-                
-                # Ustaw liczbę ludzi tylko jeśli strona nie jest zablokowana
-                if not self.side1_locked:
-                    self.dice1_people_var.set(str(unit_data["liczba_ludzi"]))
-                
-                self.update_exp_bonuses_display()
+            display_name = self.unit_side1_var.get()
+            if display_name and self.unit_side1_type != "brak":
+                # Konwertuj display name na ID jednostki
+                if hasattr(self, 'unit_side1_id_to_display') and display_name in self.unit_side1_id_to_display:
+                    unit_id = self.unit_side1_id_to_display[display_name]
+                    self.selected_unit_side1 = unit_id
+                    # Automatyczne wypełnienie danych z jednostki
+                    unit_data = self.units[self.unit_side1_type][unit_id]
+                    self.dice1_exp_var.set(unit_data["doświadczenie"])
+                    
+                    # Ustaw liczbę ludzi tylko jeśli strona nie jest zablokowana
+                    if not self.side1_locked:
+                        self.dice1_people_var.set(str(unit_data["liczba_ludzi"]))
+                    
+                    self.update_exp_bonuses_display()
         
         # Strona 2
         if hasattr(event, 'widget') and event.widget == self.unit_side2_combo:
-            unit_name = self.unit_side2_var.get()
-            if unit_name and self.unit_side2_type != "brak":
-                self.selected_unit_side2 = unit_name
-                # Automatyczne wypełnienie danych z jednostki
-                unit_data = self.units[self.unit_side2_type][unit_name]
-                self.dice2_exp_var.set(unit_data["doświadczenie"])
-                
-                # Ustaw liczbę ludzi tylko jeśli strona nie jest zablokowana
-                if not self.side2_locked:
-                    self.dice2_people_var.set(str(unit_data["liczba_ludzi"]))
-                
-                self.update_exp_bonuses_display()
+            display_name = self.unit_side2_var.get()
+            if display_name and self.unit_side2_type != "brak":
+                # Konwertuj display name na ID jednostki
+                if hasattr(self, 'unit_side2_id_to_display') and display_name in self.unit_side2_id_to_display:
+                    unit_id = self.unit_side2_id_to_display[display_name]
+                    self.selected_unit_side2 = unit_id
+                    # Automatyczne wypełnienie danych z jednostki
+                    unit_data = self.units[self.unit_side2_type][unit_id]
+                    self.dice2_exp_var.set(unit_data["doświadczenie"])
+                    
+                    # Ustaw liczbę ludzi tylko jeśli strona nie jest zablokowana
+                    if not self.side2_locked:
+                        self.dice2_people_var.set(str(unit_data["liczba_ludzi"]))
+                    
+                    self.update_exp_bonuses_display()
     
     def update_battle_units_combos(self):
         """Aktualizuje comboboxi wyboru jednostek do bitwy po załadowaniu danych"""
@@ -2192,22 +2216,40 @@ class DiceRollerApp:
             if self.unit_side1_type == "brak":
                 self.unit_side1_combo.config(values=[], state="disabled")
             else:
-                # Pobierz wszystkie jednostki i ukryj te, które już uczestniczą
-                all_units = list(self.units[self.unit_side1_type].keys())
-                participating_names = [u['name'] for u in self.participating_units["strona1"]]
-                available_units = [name for name in all_units if name not in participating_names]
-                self.unit_side1_combo.config(values=available_units, state="readonly")
+                # Pobierz wszystkie jednostki z sformatowanymi nazwami i ukryj te, które już uczestniczą
+                all_unit_ids = list(self.units[self.unit_side1_type].keys())
+                participating_ids = [u.get('id', u.get('name', '')) for u in self.participating_units["strona1"]]
+                available_unit_ids = [unit_id for unit_id in all_unit_ids if unit_id not in participating_ids]
+                
+                # Stwórz listę sformatowanych nazw i mapę
+                units_display_names = []
+                self.unit_side1_id_to_display = {}
+                for unit_id in available_unit_ids:
+                    display_name = self.get_unit_display_name(unit_id, self.unit_side1_type)
+                    units_display_names.append(display_name)
+                    self.unit_side1_id_to_display[display_name] = unit_id
+                
+                self.unit_side1_combo.config(values=units_display_names, state="readonly")
         
         # Combobox dla strony 2
         if hasattr(self, 'unit_side2_combo'):
             if self.unit_side2_type == "brak":
                 self.unit_side2_combo.config(values=[], state="disabled")
             else:
-                # Pobierz wszystkie jednostki i ukryj te, które już uczestniczą
-                all_units = list(self.units[self.unit_side2_type].keys())
-                participating_names = [u['name'] for u in self.participating_units["strona2"]]
-                available_units = [name for name in all_units if name not in participating_names]
-                self.unit_side2_combo.config(values=available_units, state="readonly")
+                # Pobierz wszystkie jednostki z sformatowanymi nazwami i ukryj te, które już uczestniczą
+                all_unit_ids = list(self.units[self.unit_side2_type].keys())
+                participating_ids = [u.get('id', u.get('name', '')) for u in self.participating_units["strona2"]]
+                available_unit_ids = [unit_id for unit_id in all_unit_ids if unit_id not in participating_ids]
+                
+                # Stwórz listę sformatowanych nazw i mapę
+                units_display_names = []
+                self.unit_side2_id_to_display = {}
+                for unit_id in available_unit_ids:
+                    display_name = self.get_unit_display_name(unit_id, self.unit_side2_type)
+                    units_display_names.append(display_name)
+                    self.unit_side2_id_to_display[display_name] = unit_id
+                
+                self.unit_side2_combo.config(values=units_display_names, state="readonly")
     
     def on_unit_side_change(self, event=None):
         """Obsługuje zmianę strony jednostki w szczegółach"""
@@ -2676,7 +2718,8 @@ class DiceRollerApp:
         history_window.rowconfigure(0, weight=1)
         
         # Nagłówek
-        header_label = ttk.Label(main_frame, text=f"Historia bitew: {unit_data['nazwa']}", font=("Arial", 12, "bold"))
+        display_name = self.get_unit_display_name(unit_data['id'], unit_data['strona'])
+        header_label = ttk.Label(main_frame, text=f"Historia bitew: {display_name}", font=("Arial", 12, "bold"))
         header_label.grid(row=0, column=0, columnspan=2, pady=(0, 10))
         
         # Statystyki ogólne
@@ -2701,7 +2744,8 @@ class DiceRollerApp:
     def show_detailed_battle_history(self, unit_data):
         """Pokazuje szczegółową historię bitew w osobnym oknie"""
         details_window = tk.Toplevel(self.root)
-        details_window.title(f"Szczegóły bitew: {unit_data['nazwa']}")
+        display_name = self.get_unit_display_name(unit_data['id'], unit_data['strona'])
+        details_window.title(f"Szczegóły bitew: {display_name}")
         details_window.geometry("600x500")
         details_window.resizable(True, True)
         
@@ -2711,8 +2755,9 @@ class DiceRollerApp:
         details_window.columnconfigure(0, weight=1)
         details_window.rowconfigure(0, weight=1)
         
-        # Nagłówek
-        header_label = ttk.Label(main_frame, text=f"Szczegółowa historia: {unit_data['nazwa']}", font=("Arial", 12, "bold"))
+        # Nagłówek  
+        display_name = self.get_unit_display_name(unit_data['id'], unit_data['strona'])
+        header_label = ttk.Label(main_frame, text=f"Szczegółowa historia: {display_name}", font=("Arial", 12, "bold"))
         header_label.grid(row=0, column=0, pady=(0, 10))
         
         # Tekst z historią
