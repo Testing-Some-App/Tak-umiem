@@ -1573,6 +1573,43 @@ class DiceRollerApp:
         
         ttk.Button(buttons_bottom_frame, text="Eksportuj dane", command=self.export_unit_data).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(buttons_bottom_frame, text="📋", command=lambda: self.show_unit_battle_history(unit_data), width=3).pack(side=tk.LEFT, padx=(5, 0))
+        ttk.Button(buttons_bottom_frame, text="Usuń", command=lambda: self.delete_unit(unit_data)).pack(side=tk.LEFT, padx=(5, 0))
+    
+    def delete_unit(self, unit_data):
+        """Usuwa jednostkę"""
+        unit_name = unit_data['nazwa']
+        unit_side = self.current_unit_side
+        
+        # Potwierdzenie usunięcia
+        if not messagebox.askyesno("Potwierdzenie", f"Czy na pewno chcesz usunąć jednostkę '{unit_name}'?\n\nTa operacja jest nieodwracalna!"):
+            return
+        
+        # Sprawdź czy jednostka nie uczestniczy w bitwie
+        participating_in_side1 = any(u['name'] == unit_name for u in self.participating_units["strona1"])
+        participating_in_side2 = any(u['name'] == unit_name for u in self.participating_units["strona2"])
+        
+        if participating_in_side1 or participating_in_side2:
+            messagebox.showwarning("Błąd", "Nie można usunąć jednostki która uczestniczy w bitwie!\nPierw zresetuj jednostki biorące udział w bitwie.")
+            return
+        
+        # Archiwizuj historię przed usunięciem
+        if 'history' in unit_data and unit_data['history']:
+            self.archive_unit_history(unit_name, unit_data)
+        
+        # Usuń jednostkę
+        del self.units[unit_side][unit_name]
+        
+        # Ukryj szczegóły
+        self.hide_unit_details()
+        
+        # Zapisz zmiany
+        self.save_units()
+        
+        # Aktualizuj wyświetlanie
+        self.update_units_display()
+        self.update_battle_units_combos()
+        
+        messagebox.showinfo("Sukces", f"Jednostka '{unit_name}' została usunięta.")
     
     def hide_unit_details(self):
         """Ukrywa szczegóły jednostki"""
@@ -1766,7 +1803,27 @@ class DiceRollerApp:
     
     def update_battle_units_combos(self):
         """Aktualizuje comboboxi wyboru jednostek do bitwy po załadowaniu danych"""
-        self.on_unit_type_change()
+        # Combobox dla strony 1
+        if hasattr(self, 'unit_side1_combo'):
+            if self.unit_side1_type == "brak":
+                self.unit_side1_combo.config(values=[], state="disabled")
+            else:
+                # Pobierz wszystkie jednostki i ukryj te, które już uczestniczą
+                all_units = list(self.units[self.unit_side1_type].keys())
+                participating_names = [u['name'] for u in self.participating_units["strona1"]]
+                available_units = [name for name in all_units if name not in participating_names]
+                self.unit_side1_combo.config(values=available_units, state="readonly")
+        
+        # Combobox dla strony 2
+        if hasattr(self, 'unit_side2_combo'):
+            if self.unit_side2_type == "brak":
+                self.unit_side2_combo.config(values=[], state="disabled")
+            else:
+                # Pobierz wszystkie jednostki i ukryj te, które już uczestniczą
+                all_units = list(self.units[self.unit_side2_type].keys())
+                participating_names = [u['name'] for u in self.participating_units["strona2"]]
+                available_units = [name for name in all_units if name not in participating_names]
+                self.unit_side2_combo.config(values=available_units, state="readonly")
     
     def on_unit_side_change(self, event=None):
         """Obsługuje zmianę strony jednostki w szczegółach"""
@@ -1900,9 +1957,13 @@ class DiceRollerApp:
                 messagebox.showwarning("Błąd", "Wybierz jednostkę dla strony 1!")
                 return
             
+            # Pobierz rzeczywistą liczbę ludzi z jednostki
+            unit_data = self.units[self.unit_side1_type][self.selected_unit_side1]
+            unit_people = unit_data["liczba_ludzi"]
+            
             unit_info = {
                 'name': self.selected_unit_side1,
-                'people': int(self.dice1_people_var.get() or "0")
+                'people': unit_people
             }
             
             # Sprawdź czy jednostka już nie uczestniczy
@@ -1914,9 +1975,9 @@ class DiceRollerApp:
             # Dodaj jednostkę
             self.participating_units["strona1"].append(unit_info)
             
-            # Zwiększ liczbę ludzi w polu
+            # Zwiększ liczbę ludzi w polu o liczbę ludzi z jednostki
             current_people = int(self.dice1_people_var.get() or "0")
-            new_total = current_people + unit_info['people']
+            new_total = current_people + unit_people
             self.dice1_people_var.set(str(new_total))
             
             # Zablokuj automatyczne uzupełnianie dla strony 1
@@ -1929,7 +1990,10 @@ class DiceRollerApp:
             self.unit_side1_var.set("")
             self.selected_unit_side1 = None
             
-            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 1! (Nowa liczba ludzi: {new_total})")
+            # Aktualizuj combobox - ukryj dodane jednostki
+            self.update_battle_units_combos()
+            
+            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 1! (Dodano: {unit_people}, Łącznie: {new_total})")
             
         elif side_number == 2:
             # Strona 2
@@ -1937,9 +2001,13 @@ class DiceRollerApp:
                 messagebox.showwarning("Błąd", "Wybierz jednostkę dla strony 2!")
                 return
             
+            # Pobierz rzeczywistą liczbę ludzi z jednostki
+            unit_data = self.units[self.unit_side2_type][self.selected_unit_side2]
+            unit_people = unit_data["liczba_ludzi"]
+            
             unit_info = {
                 'name': self.selected_unit_side2,
-                'people': int(self.dice2_people_var.get() or "0")
+                'people': unit_people
             }
             
             # Sprawdź czy jednostka już nie uczestniczy
@@ -1951,9 +2019,9 @@ class DiceRollerApp:
             # Dodaj jednostkę
             self.participating_units["strona2"].append(unit_info)
             
-            # Zwiększ liczbę ludzi w polu
+            # Zwiększ liczbę ludzi w polu o liczbę ludzi z jednostki
             current_people = int(self.dice2_people_var.get() or "0")
-            new_total = current_people + unit_info['people']
+            new_total = current_people + unit_people
             self.dice2_people_var.set(str(new_total))
             
             # Zablokuj automatyczne uzupełnianie dla strony 2
@@ -1966,11 +2034,15 @@ class DiceRollerApp:
             self.unit_side2_var.set("")
             self.selected_unit_side2 = None
             
-            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 2! (Nowa liczba ludzi: {new_total})")
+            # Aktualizuj combobox - ukryj dodane jednostki
+            self.update_battle_units_combos()
+            
+            messagebox.showinfo("Sukces", f"Jednostka dodana do strony 2! (Dodano: {unit_people}, Łącznie: {new_total})")
         
         # Aktualizuj wyświetlanie
         self.update_units_display()
         self.update_exp_bonuses_display()
+        self.update_battle_units_combos()
     
     def reset_participating_units(self):
         """Resetuje jednostki biorące udział w bitwie"""
@@ -1995,6 +2067,7 @@ class DiceRollerApp:
         # Aktualizuj wyświetlanie
         self.update_units_display()
         self.update_exp_bonuses_display()
+        self.update_battle_units_combos()
     
     def update_units_display(self):
         """Aktualizuje wyświetlanie ikon jednostek"""
