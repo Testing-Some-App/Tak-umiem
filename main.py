@@ -60,8 +60,6 @@ class DiceRollerApp:
         self.battalions = {}  # Słownik batalionów: {id: {"nazwa": string, "id": string}}
         self.current_battalion = None  # Obecnie wybrany batalion (ID)
         
-        # Liczniki numeracji jednostek
-        self.next_unit_number = {"własne": 1, "wroga": 1}
         
         # Jednostki biorące udział w bitwie
         self.participating_units = {"strona1": [], "strona2": []}  # Lista jednostek na każdej stronie
@@ -186,9 +184,35 @@ class DiceRollerApp:
         self.new_unit_battalion_combo.config(values=[''] + battalion_names)
     
     def update_next_unit_number(self):
-        """Aktualizuje następny numer jednostki dla wybranej strony"""
+        """Aktualizuje następny numer jednostki dla wybranego batalionu"""
         side = self.new_unit_side_var.get()
-        next_number = self.next_unit_number[side]
+        battalion_name = self.new_unit_battalion_var.get()
+        
+        if not battalion_name:
+            # Bez batalionu - znajdź najwyższy numer na stronie
+            max_number = 0
+            for unit_data in self.units[side].values():
+                if unit_data.get('batalion') is None:
+                    unit_number = unit_data.get('numer', 0)
+                    if unit_number > max_number:
+                        max_number = unit_number
+        else:
+            # Z batalionem - znajdź najwyższy numer w batalionie
+            battalion_id = None
+            for bid, bdata in self.battalions.items():
+                if bdata['nazwa'] == battalion_name:
+                    battalion_id = bid
+                    break
+            
+            max_number = 0
+            if battalion_id:
+                for unit_data in self.units[side].values():
+                    if unit_data.get('batalion') == battalion_id:
+                        unit_number = unit_data.get('numer', 0)
+                        if unit_number > max_number:
+                            max_number = unit_number
+        
+        next_number = max_number + 1
         self.new_unit_number_var.set(str(next_number))
     
     def migrate_old_units(self):
@@ -205,9 +229,16 @@ class DiceRollerApp:
                     new_unit_id = self.generate_random_id()
                     
                     # Utwórz nowe dane jednostki
+                    # Znajdź najwyższy numer na tej stronie dla migracji
+                    max_number = 0
+                    for existing_data in self.units[side].values():
+                        if 'numer' in existing_data:
+                            if existing_data['numer'] > max_number:
+                                max_number = existing_data['numer']
+                    
                     new_unit_data = {
                         "id": new_unit_id,
-                        "numer": self.next_unit_number[side],
+                        "numer": max_number + 1,
                         "typ": "kompania",  # domyślnie kompania
                         "batalion": None,   # brak batalionu
                         "liczba_ludzi": unit_data.get("liczba_ludzi", 150),
@@ -220,7 +251,6 @@ class DiceRollerApp:
                     }
                     
                     units_to_migrate[side].append((unit_key, new_unit_id, new_unit_data))
-                    self.next_unit_number[side] += 1
         
         # Wykonaj migrację
         for side in ['własne', 'wroga']:
@@ -420,6 +450,7 @@ class DiceRollerApp:
         self.new_unit_battalion_combo = ttk.Combobox(create_unit_frame, textvariable=self.new_unit_battalion_var, 
                                                     values=[], state="readonly", width=12)
         self.new_unit_battalion_combo.grid(row=3, column=1, sticky=tk.W, pady=(5, 0))
+        self.new_unit_battalion_combo.bind("<<ComboboxSelected>>", lambda e: self.update_next_unit_number())
         
         # Przyciski wyboru strony dla nowej jednostki
         create_buttons_frame = ttk.Frame(create_unit_frame)
@@ -1730,23 +1761,7 @@ class DiceRollerApp:
         # Pobranie wybranej strony z przycisków radio
         side = self.new_unit_side_var.get()
         
-        # Pobranie numeru jednostki
-        try:
-            unit_number = int(self.new_unit_number_var.get() or self.next_unit_number[side])
-        except ValueError:
-            messagebox.showwarning("Błąd", "Numer jednostki musi być liczbą!")
-            return
-        
-        # Sprawdzenie czy jednostka o tym numerze już istnieje
-        for unit_id, unit_data in self.units[side].items():
-            if unit_data.get('numer', 1) == unit_number:
-                messagebox.showwarning("Błąd", f"Jednostka o numerze {unit_number} już istnieje na stronie {side}!")
-                return
-        
-        # Pobranie typu jednostki
-        unit_type = self.new_unit_type_var.get()
-        
-        # Pobranie batalionu (jeśli wybrano)
+        # Pobranie batalionu (potrzebne do sprawdzania duplikatów)
         battalion_name = self.new_unit_battalion_var.get()
         battalion_id = None
         if battalion_name:
@@ -1754,6 +1769,25 @@ class DiceRollerApp:
                 if data['nazwa'] == battalion_name:
                     battalion_id = bid
                     break
+        
+        # Pobranie numeru jednostki
+        try:
+            unit_number = int(self.new_unit_number_var.get() or "1")
+        except ValueError:
+            messagebox.showwarning("Błąd", "Numer jednostki musi być liczbą!")
+            return
+        
+        # Sprawdzenie czy jednostka o tym numerze już istnieje w tym batalionie
+        for unit_id, unit_data in self.units[side].items():
+            if (unit_data.get('numer', 1) == unit_number and 
+                unit_data.get('batalion') == battalion_id):
+                battalion_display = self.get_battalion_display_name(battalion_id) if battalion_id else "(bez batalionu)"
+                messagebox.showwarning("Błąd", f"Jednostka o numerze {unit_number} już istnieje w batalionie {battalion_display}!")
+                return
+        
+        # Pobranie typu jednostki
+        unit_type = self.new_unit_type_var.get()
+        
         
         # Generowanie ID jednostki
         unit_id = self.generate_random_id()
@@ -1776,9 +1810,6 @@ class DiceRollerApp:
         # Dodanie jednostki
         self.units[side][unit_id] = unit_data
         
-        # Aktualizacja następnego numeru
-        if unit_number >= self.next_unit_number[side]:
-            self.next_unit_number[side] = unit_number + 1
         
         # Aktualizacja interfejsu
         self.update_units_combos()
