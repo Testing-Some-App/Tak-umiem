@@ -1969,29 +1969,71 @@ class DiceRollerApp:
     
     def update_unit_stats_after_battle(self, dice1_final, dice2_final):
         """Aktualizuje statystyki jednostek po bitwie"""
-        # Aktualizacja jednostki strony 1
+        # Zbierz wszystkie jednostki strony 1
+        all_side1_units = list(self.participating_units["strona1"])
         if self.selected_unit_side1 and self.unit_side1_type != "brak":
-            if self.selected_unit_side1 in self.units[self.unit_side1_type]:
-                unit_data = self.units[self.unit_side1_type][self.selected_unit_side1]
-                
-                # Aktualizacja liczby ludzi
-                unit_data["liczba_ludzi"] = self.dice1_people_result
-                
-                # Aktualizacja zwycięstw (jeśli rzut > 1 i wygrała)
-                if dice1_final > 1 and dice1_final > dice2_final:
-                    unit_data["liczba_zwycięstw"] += 1
+            if not any(u['name'] == self.selected_unit_side1 for u in all_side1_units):
+                all_side1_units.append({
+                    'name': self.selected_unit_side1,
+                    'people': self.dice1_people_original
+                })
         
-        # Aktualizacja jednostki strony 2
+        # Aktualizacja jednostek strony 1
+        side1_won = dice1_final > 1 and dice1_final > dice2_final
+        total_losses_1 = max(0, self.dice1_people_original - self.dice1_people_result)
+        
+        for unit in all_side1_units:
+            unit_name = unit['name']
+            for side_name in ['własne', 'wroga']:
+                if unit_name in self.units[side_name]:
+                    unit_data = self.units[side_name][unit_name]
+                    
+                    # Aktualizacja liczby ludzi (proporcjonalnie do strat)
+                    if len(all_side1_units) == 1:
+                        # Jedna jednostka - bezpośrednio
+                        unit_data["liczba_ludzi"] = self.dice1_people_result
+                    else:
+                        # Wiele jednostek - rozdziel straty proporcjonalnie
+                        unit_losses = total_losses_1 // len(all_side1_units)
+                        unit_data["liczba_ludzi"] = max(0, unit_data["liczba_ludzi"] - unit_losses)
+                    
+                    # Aktualizacja zwycięstw
+                    if side1_won:
+                        unit_data["liczba_zwycięstw"] += 1
+                    break
+        
+        # Zbierz wszystkie jednostki strony 2
+        all_side2_units = list(self.participating_units["strona2"])
         if self.selected_unit_side2 and self.unit_side2_type != "brak":
-            if self.selected_unit_side2 in self.units[self.unit_side2_type]:
-                unit_data = self.units[self.unit_side2_type][self.selected_unit_side2]
-                
-                # Aktualizacja liczby ludzi
-                unit_data["liczba_ludzi"] = self.dice2_people_result
-                
-                # Aktualizacja zwycięstw (jeśli rzut > 1 i wygrała)
-                if dice2_final > 1 and dice2_final > dice1_final:
-                    unit_data["liczba_zwycięstw"] += 1
+            if not any(u['name'] == self.selected_unit_side2 for u in all_side2_units):
+                all_side2_units.append({
+                    'name': self.selected_unit_side2,
+                    'people': self.dice2_people_original
+                })
+        
+        # Aktualizacja jednostek strony 2
+        side2_won = dice2_final > 1 and dice2_final > dice1_final
+        total_losses_2 = max(0, self.dice2_people_original - self.dice2_people_result)
+        
+        for unit in all_side2_units:
+            unit_name = unit['name']
+            for side_name in ['własne', 'wroga']:
+                if unit_name in self.units[side_name]:
+                    unit_data = self.units[side_name][unit_name]
+                    
+                    # Aktualizacja liczby ludzi (proporcjonalnie do strat)
+                    if len(all_side2_units) == 1:
+                        # Jedna jednostka - bezpośrednio
+                        unit_data["liczba_ludzi"] = self.dice2_people_result
+                    else:
+                        # Wiele jednostek - rozdziel straty proporcjonalnie
+                        unit_losses = total_losses_2 // len(all_side2_units)
+                        unit_data["liczba_ludzi"] = max(0, unit_data["liczba_ludzi"] - unit_losses)
+                    
+                    # Aktualizacja zwycięstw
+                    if side2_won:
+                        unit_data["liczba_zwycięstw"] += 1
+                    break
         
         # Aktualizacja interfejsu jednostek jeśli jakaś jest aktualnie wyświetlana
         if self.current_unit:
@@ -2200,12 +2242,37 @@ class DiceRollerApp:
         """Dodaje informacje o bitwie do historii jednostek"""
         import datetime
         
+        # Zbierz informacje o bitwie
+        side1_units = [u['name'] for u in self.participating_units["strona1"]]
+        side2_units = [u['name'] for u in self.participating_units["strona2"]]
+        
+        # Dodaj jednostki wybrane normalnie
+        if self.selected_unit_side1 and self.unit_side1_type != "brak":
+            if self.selected_unit_side1 not in side1_units:
+                side1_units.append(self.selected_unit_side1)
+        
+        if self.selected_unit_side2 and self.unit_side2_type != "brak":
+            if self.selected_unit_side2 not in side2_units:
+                side2_units.append(self.selected_unit_side2)
+        
+        # Określ tryb walki
+        side1_attacking = getattr(self, 'side1_attack_var', tk.BooleanVar()).get()
+        side2_attacking = getattr(self, 'side2_attack_var', tk.BooleanVar()).get() 
+        side1_in_motion = getattr(self, 'side1_in_motion_var', tk.BooleanVar()).get()
+        side2_in_motion = getattr(self, 'side2_in_motion_var', tk.BooleanVar()).get()
+        
         battle_info = {
             'data': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'),
             'wynik_kostki': None,
             'przeciwnik_kostka': None,
             'straty': 0,
-            'zwyciestwo': False
+            'zwyciestwo': False,
+            'side1_units': side1_units,
+            'side2_units': side2_units,
+            'side1_attacking': side1_attacking,
+            'side2_attacking': side2_attacking,
+            'side1_in_motion': side1_in_motion,
+            'side2_in_motion': side2_in_motion
         }
         
         # Zbierz wszystkie jednostki strony 1 (participating + wybrane normalnie)
@@ -2239,6 +2306,9 @@ class DiceRollerApp:
                     
                     unit_battle_info = battle_info_side1.copy()
                     unit_battle_info['straty'] = unit_losses
+                    # Dodaj informacje specyficzne dla strony 1
+                    unit_battle_info['friendly_units'] = side1_units
+                    unit_battle_info['enemy_units'] = side2_units
                     
                     # Dodaj do historii jednostki
                     unit_name = unit['name']
@@ -2280,6 +2350,9 @@ class DiceRollerApp:
                     
                     unit_battle_info = battle_info_side2.copy()
                     unit_battle_info['straty'] = unit_losses
+                    # Dodaj informacje specyficzne dla strony 2
+                    unit_battle_info['friendly_units'] = side2_units
+                    unit_battle_info['enemy_units'] = side1_units
                     
                     # Dodaj do historii jednostki
                     unit_name = unit['name']
@@ -2366,9 +2439,47 @@ class DiceRollerApp:
         else:
             for i, battle in enumerate(reversed(unit_data['historia_bitew']), 1):
                 victory_icon = " ⭐" if battle['zwyciestwo'] else ""
-                history_line = f"#{i}: {battle['data']}\n"
-                history_line += f"   Kostka: {battle['wynik_kostki']}{victory_icon} vs Przeciwnik: {battle['przeciwnik_kostka']}\n"
-                history_line += f"   Straty: {battle['straty']} ludzi\n\n"
+                
+                # Nowy format z ofensywami jeśli są dostępne dane
+                friendly_units = battle.get('friendly_units', [])
+                enemy_units = battle.get('enemy_units', [])
+                
+                if friendly_units and enemy_units:
+                    # Nowy format z nazwami jednostek i trybem bitwy
+                    side_in_motion = battle.get('side1_in_motion', False) or battle.get('side2_in_motion', False)
+                    side_attacking = battle.get('side1_attacking', False) or battle.get('side2_attacking', False)
+                    
+                    # Formatuj nazwy jednostek
+                    friendly_name = friendly_units[0]
+                    if len(friendly_units) > 1:
+                        friendly_name += ", " + ", ".join(friendly_units[1:])
+                        
+                    enemy_name = enemy_units[0]
+                    if len(enemy_units) > 1:
+                        enemy_name += ", " + ", ".join(enemy_units[1:])
+                    
+                    # Określ typ bitwy
+                    if side_in_motion:
+                        battle_desc = f"Bitwa \"{friendly_name}\" z \"{enemy_name}\""
+                    elif side_attacking:
+                        # Sprawdź kto atakuje na podstawie wyników
+                        if battle['wynik_kostki'] >= battle['przeciwnik_kostka']:
+                            battle_desc = f"Ofensywa \"{friendly_name}\" na \"{enemy_name}\""
+                        else:
+                            battle_desc = f"Obrona \"{friendly_name}\" przed \"{enemy_name}\""
+                    else:
+                        battle_desc = f"Ofensywa \"{friendly_name}\" na \"{enemy_name}\""
+                    
+                    history_line = f"#{i}: {battle['data']}\n"
+                    history_line += f"   {battle_desc}\n"
+                    history_line += f"   Kostka: {battle['wynik_kostki']}{victory_icon} vs Przeciwnik: {battle['przeciwnik_kostka']}\n"
+                    history_line += f"   Straty: {battle['straty']} ludzi\n\n"
+                else:
+                    # Stary format dla starych zapisów
+                    history_line = f"#{i}: {battle['data']}\n"
+                    history_line += f"   Kostka: {battle['wynik_kostki']}{victory_icon} vs Przeciwnik: {battle['przeciwnik_kostka']}\n"
+                    history_line += f"   Straty: {battle['straty']} ludzi\n\n"
+                
                 history_text.insert(tk.END, history_line)
         
         history_text.config(state=tk.DISABLED)
