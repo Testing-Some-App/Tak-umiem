@@ -53,6 +53,8 @@ class DiceRollerApp:
         
         # Jednostki biorące udział w bitwie
         self.participating_units = {"strona1": [], "strona2": []}  # Lista jednostek na każdej stronie
+        self.side1_locked = False  # Czy strona 1 ma zablokowane automatyczne uzupełnianie
+        self.side2_locked = False  # Czy strona 2 ma zablokowane automatyczne uzupełnianie
         
         # Jednostki wybrane do bitwy
         self.selected_unit_side1 = None  # Nazwa wybranej jednostki dla strony 1
@@ -357,9 +359,20 @@ class DiceRollerApp:
         separator_units = ttk.Separator(units_selection_frame, orient='vertical')
         separator_units.grid(row=0, column=1, sticky=tk.N+tk.S, padx=20)
         
+        # Frame kontener dla wyników z przyciskiem reset
+        results_container = ttk.Frame(self.game_frame)
+        results_container.grid(row=3, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 20))
+        
+        # Mały przycisk reset po lewej stronie
+        reset_button = ttk.Button(results_container, text="R", command=self.reset_participating_units, width=2)
+        reset_button.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+        
         # Frame dla wyników kości (horizontal layout)
-        dice_frame = ttk.LabelFrame(self.game_frame, text="Wyniki", padding="15")
-        dice_frame.grid(row=3, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 20))
+        dice_frame = ttk.LabelFrame(results_container, text="Wyniki", padding="15")
+        dice_frame.grid(row=0, column=1, sticky=tk.W+tk.E)
+        
+        # Konfiguracja kolumn
+        results_container.columnconfigure(1, weight=1)
         
         # Pierwsza strona - liczba ludzi i nazwa
         people1_frame = ttk.Frame(dice_frame)
@@ -455,21 +468,14 @@ class DiceRollerApp:
         self.tactical_result_label.grid(row=4, column=0, columnspan=3, pady=(10, 5))
         
         
-        # Frame dla przycisków
-        buttons_frame = ttk.Frame(self.game_frame)
-        buttons_frame.grid(row=5, column=0, columnspan=3, pady=(5, 10))
-        
-        # Przycisk Reset jednostek uczestniczących
-        ttk.Button(buttons_frame, text="Reset jednostek", command=self.reset_participating_units).pack(pady=(0, 5))
-        
         # Przycisk do generowania wyniku
         self.roll_button = ttk.Button(
-            buttons_frame,
+            self.game_frame,
             text="Wynik",
             command=self.roll_dice,
             style="Roll.TButton"
         )
-        self.roll_button.pack(pady=(5, 0))
+        self.roll_button.grid(row=5, column=0, columnspan=3, pady=(5, 20))
         
         # Stylizacja przycisków
         style = ttk.Style()
@@ -865,6 +871,9 @@ class DiceRollerApp:
         
         # Dodanie do historii (bez informacji o jednostkach)
         self.add_to_history(dice1_final, dice2_final)
+        
+        # Dodanie do historii jednostek
+        self.add_to_unit_battle_history(dice1_final, dice2_final)
         
         # Efekt wizualny - krótka animacja przycisku
         self.roll_button.config(state="disabled")
@@ -1382,6 +1391,12 @@ class DiceRollerApp:
                 if "wroga" not in self.units:
                     self.units["wroga"] = {}
                 
+                # Dodanie pola historia_bitew do istniejących jednostek
+                for side in ["własne", "wroga"]:
+                    for unit_name, unit_data in self.units[side].items():
+                        if "historia_bitew" not in unit_data:
+                            unit_data["historia_bitew"] = []
+                
                 # Aktualizacja interfejsu
                 self.update_units_combos()
                 self.update_battle_units_combos()
@@ -1414,7 +1429,8 @@ class DiceRollerApp:
             "zapasy": 3,
             "liczba_zwycięstw": 0,
             "liczba_uzupełnień": 0,
-            "strona": side  # Pole strony według wyboru
+            "strona": side,  # Pole strony według wyboru
+            "historia_bitew": []  # Historia udziału w bitwach
         }
         
         # Dodanie jednostki
@@ -1550,9 +1566,13 @@ class DiceRollerApp:
         ttk.Radiobutton(side_buttons_frame, text="Swoje", variable=self.unit_side_var, value="własne", command=self.on_unit_side_change).grid(row=0, column=0, padx=(0, 10))
         ttk.Radiobutton(side_buttons_frame, text="Wróg", variable=self.unit_side_var, value="wroga", command=self.on_unit_side_change).grid(row=0, column=1, padx=(10, 0))
         
-        # Przycisk eksportu
+        # Przyciski na dole
         row += 1
-        ttk.Button(self.unit_details_frame, text="Eksportuj dane", command=self.export_unit_data).grid(row=row, column=0, columnspan=2, pady=(5, 0))
+        buttons_bottom_frame = ttk.Frame(self.unit_details_frame)
+        buttons_bottom_frame.grid(row=row, column=0, columnspan=2, pady=(5, 0))
+        
+        ttk.Button(buttons_bottom_frame, text="Eksportuj dane", command=self.export_unit_data).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(buttons_bottom_frame, text="📋", command=lambda: self.show_unit_battle_history(unit_data), width=3).pack(side=tk.LEFT, padx=(5, 0))
     
     def hide_unit_details(self):
         """Ukrywa szczegóły jednostki"""
@@ -1723,8 +1743,8 @@ class DiceRollerApp:
                 unit_data = self.units[self.unit_side1_type][unit_name]
                 self.dice1_exp_var.set(unit_data["doświadczenie"])
                 
-                # Ustaw liczbę ludzi tylko jeśli nie ma jednostek uczestniczących
-                if not self.participating_units["strona1"]:
+                # Ustaw liczbę ludzi tylko jeśli strona nie jest zablokowana
+                if not self.side1_locked:
                     self.dice1_people_var.set(str(unit_data["liczba_ludzi"]))
                 
                 self.update_exp_bonuses_display()
@@ -1738,8 +1758,8 @@ class DiceRollerApp:
                 unit_data = self.units[self.unit_side2_type][unit_name]
                 self.dice2_exp_var.set(unit_data["doświadczenie"])
                 
-                # Ustaw liczbę ludzi tylko jeśli nie ma jednostek uczestniczących
-                if not self.participating_units["strona2"]:
+                # Ustaw liczbę ludzi tylko jeśli strona nie jest zablokowana
+                if not self.side2_locked:
                     self.dice2_people_var.set(str(unit_data["liczba_ludzi"]))
                 
                 self.update_exp_bonuses_display()
@@ -1899,6 +1919,9 @@ class DiceRollerApp:
             new_total = current_people + unit_info['people']
             self.dice1_people_var.set(str(new_total))
             
+            # Zablokuj automatyczne uzupełnianie dla strony 1
+            self.side1_locked = True
+            
             # Reset modyfikatorów dla strony 1
             self.dice1_exp_var.set(0)
             
@@ -1933,6 +1956,9 @@ class DiceRollerApp:
             new_total = current_people + unit_info['people']
             self.dice2_people_var.set(str(new_total))
             
+            # Zablokuj automatyczne uzupełnianie dla strony 2
+            self.side2_locked = True
+            
             # Reset modyfikatorów dla strony 2
             self.dice2_exp_var.set(0)
             
@@ -1950,6 +1976,10 @@ class DiceRollerApp:
         """Resetuje jednostki biorące udział w bitwie"""
         self.participating_units = {"strona1": [], "strona2": []}
         
+        # Odblokuj automatyczne uzupełnianie
+        self.side1_locked = False
+        self.side2_locked = False
+        
         # Reset wszystkich pól
         self.dice1_exp_var.set(0)
         self.dice2_exp_var.set(0)
@@ -1965,8 +1995,6 @@ class DiceRollerApp:
         # Aktualizuj wyświetlanie
         self.update_units_display()
         self.update_exp_bonuses_display()
-        
-        messagebox.showinfo("Sukces", "Jednostki uczestniczące zostały zresetowane!")
     
     def update_units_display(self):
         """Aktualizuje wyświetlanie ikon jednostek"""
@@ -1987,6 +2015,172 @@ class DiceRollerApp:
                 self.side2_units_label.config(text=f"{icons} ({total_people} ludzi)")
             else:
                 self.side2_units_label.config(text="")
+    
+    def add_to_unit_battle_history(self, dice1_final, dice2_final):
+        """Dodaje informacje o bitwie do historii jednostek"""
+        import datetime
+        
+        battle_info = {
+            'data': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'wynik_kostki': None,
+            'przeciwnik_kostka': None,
+            'straty': 0,
+            'zwyciestwo': False
+        }
+        
+        # Historia dla jednostek strony 1
+        if self.participating_units["strona1"]:
+            battle_info_side1 = battle_info.copy()
+            battle_info_side1['wynik_kostki'] = dice1_final
+            battle_info_side1['przeciwnik_kostka'] = dice2_final
+            battle_info_side1['straty'] = max(0, self.dice1_people_original - self.dice1_people_result)
+            battle_info_side1['zwyciestwo'] = dice1_final > dice2_final and dice1_final > 1
+            
+            # Rozdziel straty między jednostkami
+            total_losses = battle_info_side1['straty']
+            if total_losses > 0 and len(self.participating_units["strona1"]) > 0:
+                losses_per_unit = total_losses // len(self.participating_units["strona1"])
+                remainder = total_losses % len(self.participating_units["strona1"])
+                
+                for i, unit in enumerate(self.participating_units["strona1"]):
+                    unit_losses = losses_per_unit
+                    if i < remainder:
+                        unit_losses += 1
+                    
+                    unit_battle_info = battle_info_side1.copy()
+                    unit_battle_info['straty'] = unit_losses
+                    
+                    # Dodaj do historii jednostki
+                    unit_name = unit['name']
+                    for side_name in ['własne', 'wroga']:
+                        if unit_name in self.units[side_name]:
+                            if 'historia_bitew' not in self.units[side_name][unit_name]:
+                                self.units[side_name][unit_name]['historia_bitew'] = []
+                            self.units[side_name][unit_name]['historia_bitew'].append(unit_battle_info)
+                            break
+        
+        # Historia dla jednostek strony 2
+        if self.participating_units["strona2"]:
+            battle_info_side2 = battle_info.copy()
+            battle_info_side2['wynik_kostki'] = dice2_final
+            battle_info_side2['przeciwnik_kostka'] = dice1_final
+            battle_info_side2['straty'] = max(0, self.dice2_people_original - self.dice2_people_result)
+            battle_info_side2['zwyciestwo'] = dice2_final > dice1_final and dice2_final > 1
+            
+            # Rozdziel straty między jednostkami
+            total_losses = battle_info_side2['straty']
+            if total_losses > 0 and len(self.participating_units["strona2"]) > 0:
+                losses_per_unit = total_losses // len(self.participating_units["strona2"])
+                remainder = total_losses % len(self.participating_units["strona2"])
+                
+                for i, unit in enumerate(self.participating_units["strona2"]):
+                    unit_losses = losses_per_unit
+                    if i < remainder:
+                        unit_losses += 1
+                    
+                    unit_battle_info = battle_info_side2.copy()
+                    unit_battle_info['straty'] = unit_losses
+                    
+                    # Dodaj do historii jednostki
+                    unit_name = unit['name']
+                    for side_name in ['własne', 'wroga']:
+                        if unit_name in self.units[side_name]:
+                            if 'historia_bitew' not in self.units[side_name][unit_name]:
+                                self.units[side_name][unit_name]['historia_bitew'] = []
+                            self.units[side_name][unit_name]['historia_bitew'].append(unit_battle_info)
+                            break
+    
+    def show_unit_battle_history(self, unit_data):
+        """Pokazuje okienko z historią bitew jednostki"""
+        # Upewnij się, że jednostka ma historię bitew
+        if 'historia_bitew' not in unit_data:
+            unit_data['historia_bitew'] = []
+        
+        # Utworzenie okna historii
+        history_window = tk.Toplevel(self.root)
+        history_window.title(f"Historia bitew: {unit_data['nazwa']}")
+        history_window.geometry("500x400")
+        history_window.resizable(True, True)
+        
+        # Ramka główna
+        main_frame = ttk.Frame(history_window, padding="10")
+        main_frame.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
+        history_window.columnconfigure(0, weight=1)
+        history_window.rowconfigure(0, weight=1)
+        
+        # Nagłówek
+        header_label = ttk.Label(main_frame, text=f"Historia bitew: {unit_data['nazwa']}", font=("Arial", 12, "bold"))
+        header_label.grid(row=0, column=0, columnspan=2, pady=(0, 10))
+        
+        # Statystyki ogólne
+        total_battles = len(unit_data['historia_bitew'])
+        total_losses = sum(battle['straty'] for battle in unit_data['historia_bitew'])
+        victories = sum(1 for battle in unit_data['historia_bitew'] if battle['zwyciestwo'])
+        
+        stats_text = f"Liczba bitew: {total_battles} | Zwycięstwa: {victories} | Łączne straty: {total_losses}"
+        stats_label = ttk.Label(main_frame, text=stats_text, font=("Arial", 10))
+        stats_label.grid(row=1, column=0, columnspan=2, pady=(0, 10))
+        
+        # Przycisk do pokazania szczegółów
+        ttk.Button(main_frame, text="Pokaż szczegóły bitew", 
+                  command=lambda: self.show_detailed_battle_history(unit_data)).grid(row=2, column=0, columnspan=2, pady=(0, 10))
+        
+        # Przycisk zamknij
+        ttk.Button(main_frame, text="Zamknij", command=history_window.destroy).grid(row=3, column=0, columnspan=2, pady=(10, 0))
+        
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.columnconfigure(1, weight=1)
+    
+    def show_detailed_battle_history(self, unit_data):
+        """Pokazuje szczegółową historię bitew w osobnym oknie"""
+        details_window = tk.Toplevel(self.root)
+        details_window.title(f"Szczegóły bitew: {unit_data['nazwa']}")
+        details_window.geometry("600x500")
+        details_window.resizable(True, True)
+        
+        # Ramka główna
+        main_frame = ttk.Frame(details_window, padding="10")
+        main_frame.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
+        details_window.columnconfigure(0, weight=1)
+        details_window.rowconfigure(0, weight=1)
+        
+        # Nagłówek
+        header_label = ttk.Label(main_frame, text=f"Szczegółowa historia: {unit_data['nazwa']}", font=("Arial", 12, "bold"))
+        header_label.grid(row=0, column=0, pady=(0, 10))
+        
+        # Tekst z historią
+        history_frame = ttk.Frame(main_frame)
+        history_frame.grid(row=1, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
+        
+        # Scrollowany tekst
+        history_text = tk.Text(history_frame, wrap=tk.WORD, height=20, width=70)
+        scrollbar = ttk.Scrollbar(history_frame, orient=tk.VERTICAL, command=history_text.yview)
+        history_text.configure(yscrollcommand=scrollbar.set)
+        
+        history_text.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
+        scrollbar.grid(row=0, column=1, sticky=tk.N+tk.S)
+        
+        # Wypełnienie historii
+        if not unit_data['historia_bitew']:
+            history_text.insert(tk.END, "Brak historii bitew dla tej jednostki.\n")
+        else:
+            for i, battle in enumerate(reversed(unit_data['historia_bitew']), 1):
+                victory_icon = " ⭐" if battle['zwyciestwo'] else ""
+                history_line = f"#{i}: {battle['data']}\n"
+                history_line += f"   Kostka: {battle['wynik_kostki']}{victory_icon} vs Przeciwnik: {battle['przeciwnik_kostka']}\n"
+                history_line += f"   Straty: {battle['straty']} ludzi\n\n"
+                history_text.insert(tk.END, history_line)
+        
+        history_text.config(state=tk.DISABLED)
+        
+        # Przycisk zamknij
+        ttk.Button(main_frame, text="Zamknij", command=details_window.destroy).grid(row=2, column=0, pady=(10, 0))
+        
+        # Konfiguracja kolumn i wierszy
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(1, weight=1)
+        history_frame.columnconfigure(0, weight=1)
+        history_frame.rowconfigure(0, weight=1)
 
 
 def main():
