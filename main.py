@@ -1112,11 +1112,11 @@ class DiceRollerApp:
             if self.selected_unit_side2 not in side2_units:
                 side2_units.append(self.selected_unit_side2)
         
-        # Określ tryb walki
-        side1_attacking = getattr(self, 'side1_attack_var', tk.BooleanVar()).get()
-        side2_attacking = getattr(self, 'side2_attack_var', tk.BooleanVar()).get() 
-        side1_in_motion = getattr(self, 'side1_in_motion_var', tk.BooleanVar()).get()
-        side2_in_motion = getattr(self, 'side2_in_motion_var', tk.BooleanVar()).get()
+        # Określ tryb walki - użyj poprawnych nazw zmiennych
+        side1_attacking = self.side1_attack_var.get()
+        side2_attacking = self.side2_attack_var.get() 
+        side1_in_motion = self.side1_motion_var.get()
+        side2_in_motion = self.side2_motion_var.get()
         
         history_entry = {
             'dice1': dice1_final,
@@ -1982,6 +1982,9 @@ class DiceRollerApp:
         side1_won = dice1_final > 1 and dice1_final > dice2_final
         total_losses_1 = max(0, self.dice1_people_original - self.dice1_people_result)
         
+        # Debug info
+        print(f"DEBUG: Strona 1 - jednostki: {[u['name'] for u in all_side1_units]}, wygrała: {side1_won}")
+        
         for unit in all_side1_units:
             unit_name = unit['name']
             for side_name in ['własne', 'wroga']:
@@ -2014,6 +2017,9 @@ class DiceRollerApp:
         # Aktualizacja jednostek strony 2
         side2_won = dice2_final > 1 and dice2_final > dice1_final
         total_losses_2 = max(0, self.dice2_people_original - self.dice2_people_result)
+        
+        # Debug info
+        print(f"DEBUG: Strona 2 - jednostki: {[u['name'] for u in all_side2_units]}, wygrała: {side2_won}")
         
         for unit in all_side2_units:
             unit_name = unit['name']
@@ -2255,11 +2261,11 @@ class DiceRollerApp:
             if self.selected_unit_side2 not in side2_units:
                 side2_units.append(self.selected_unit_side2)
         
-        # Określ tryb walki
-        side1_attacking = getattr(self, 'side1_attack_var', tk.BooleanVar()).get()
-        side2_attacking = getattr(self, 'side2_attack_var', tk.BooleanVar()).get() 
-        side1_in_motion = getattr(self, 'side1_in_motion_var', tk.BooleanVar()).get()
-        side2_in_motion = getattr(self, 'side2_in_motion_var', tk.BooleanVar()).get()
+        # Określ tryb walki - użyj poprawnych nazw zmiennych  
+        side1_attacking = self.side1_attack_var.get()
+        side2_attacking = self.side2_attack_var.get() 
+        side1_in_motion = self.side1_motion_var.get()
+        side2_in_motion = self.side2_motion_var.get()
         
         battle_info = {
             'data': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'),
