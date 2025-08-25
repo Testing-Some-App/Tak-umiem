@@ -2314,10 +2314,12 @@ class DiceRollerApp:
         # Zbierz wszystkie jednostki strony 1
         all_side1_units = list(self.participating_units["strona1"])
         if self.selected_unit_side1 and self.unit_side1_type != "brak":
-            if not any(u['name'] == self.selected_unit_side1 for u in all_side1_units):
+            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side1 for u in all_side1_units):
                 all_side1_units.append({
+                    'id': self.selected_unit_side1,
                     'name': self.selected_unit_side1,
-                    'people': self.dice1_people_original
+                    'people': self.dice1_people_original,
+                    'side': self.unit_side1_type
                 })
         
         # Aktualizacja jednostek strony 1
@@ -2334,10 +2336,10 @@ class DiceRollerApp:
         print(f"DEBUG: Strona 1 - jednostki: {side1_display_names}, wygrała: {side1_won}")
         
         for unit in all_side1_units:
-            unit_name = unit['name']
+            unit_id = unit.get('id', unit.get('name', ''))
             for side_name in ['własne', 'wroga']:
-                if unit_name in self.units[side_name]:
-                    unit_data = self.units[side_name][unit_name]
+                if unit_id in self.units[side_name]:
+                    unit_data = self.units[side_name][unit_id]
                     
                     # Aktualizacja liczby ludzi (proporcjonalnie do strat)
                     if len(all_side1_units) == 1:
@@ -2356,10 +2358,12 @@ class DiceRollerApp:
         # Zbierz wszystkie jednostki strony 2
         all_side2_units = list(self.participating_units["strona2"])
         if self.selected_unit_side2 and self.unit_side2_type != "brak":
-            if not any(u['name'] == self.selected_unit_side2 for u in all_side2_units):
+            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side2 for u in all_side2_units):
                 all_side2_units.append({
+                    'id': self.selected_unit_side2,
                     'name': self.selected_unit_side2,
-                    'people': self.dice2_people_original
+                    'people': self.dice2_people_original,
+                    'side': self.unit_side2_type
                 })
         
         # Aktualizacja jednostek strony 2
@@ -2376,10 +2380,10 @@ class DiceRollerApp:
         print(f"DEBUG: Strona 2 - jednostki: {side2_display_names}, wygrała: {side2_won}")
         
         for unit in all_side2_units:
-            unit_name = unit['name']
+            unit_id = unit.get('id', unit.get('name', ''))
             for side_name in ['własne', 'wroga']:
-                if unit_name in self.units[side_name]:
-                    unit_data = self.units[side_name][unit_name]
+                if unit_id in self.units[side_name]:
+                    unit_data = self.units[side_name][unit_id]
                     
                     # Aktualizacja liczby ludzi (proporcjonalnie do strat)
                     if len(all_side2_units) == 1:
@@ -2420,10 +2424,10 @@ class DiceRollerApp:
                     unit['people'] = max(0, unit['people'] - losses)
                     
                     # Zaktualizuj jednostkę w głównym słowniku
-                    unit_name = unit['name']
+                    unit_id = unit.get('id', unit.get('name', ''))
                     for side_name in ['własne', 'wroga']:
-                        if unit_name in self.units[side_name]:
-                            self.units[side_name][unit_name]['liczba_ludzi'] = unit['people']
+                        if unit_id in self.units[side_name]:
+                            self.units[side_name][unit_id]['liczba_ludzi'] = unit['people']
                             break
         
         # Straty strony 2
@@ -2442,10 +2446,10 @@ class DiceRollerApp:
                     unit['people'] = max(0, unit['people'] - losses)
                     
                     # Zaktualizuj jednostkę w głównym słowniku
-                    unit_name = unit['name']
+                    unit_id = unit.get('id', unit.get('name', ''))
                     for side_name in ['własne', 'wroga']:
-                        if unit_name in self.units[side_name]:
-                            self.units[side_name][unit_name]['liczba_ludzi'] = unit['people']
+                        if unit_id in self.units[side_name]:
+                            self.units[side_name][unit_id]['liczba_ludzi'] = unit['people']
                             break
     
     def add_more_units_side(self, side_number):
@@ -2461,12 +2465,14 @@ class DiceRollerApp:
             unit_people = unit_data["liczba_ludzi"]
             
             unit_info = {
+                'id': self.selected_unit_side1,
                 'name': self.selected_unit_side1,
-                'people': unit_people
+                'people': unit_people,
+                'side': self.unit_side1_type
             }
             
             # Sprawdź czy jednostka już nie uczestniczy
-            existing = [u for u in self.participating_units["strona1"] if u['name'] == unit_info['name']]
+            existing = [u for u in self.participating_units["strona1"] if u.get('id', u.get('name', '')) == unit_info['id']]
             if existing:
                 messagebox.showwarning("Błąd", "Ta jednostka już uczestniczy w bitwie!")
                 return
@@ -2510,12 +2516,14 @@ class DiceRollerApp:
             unit_people = unit_data["liczba_ludzi"]
             
             unit_info = {
+                'id': self.selected_unit_side2,
                 'name': self.selected_unit_side2,
-                'people': unit_people
+                'people': unit_people,
+                'side': self.unit_side2_type
             }
             
             # Sprawdź czy jednostka już nie uczestniczy
-            existing = [u for u in self.participating_units["strona2"] if u['name'] == unit_info['name']]
+            existing = [u for u in self.participating_units["strona2"] if u.get('id', u.get('name', '')) == unit_info['id']]
             if existing:
                 messagebox.showwarning("Błąd", "Ta jednostka już uczestniczy w bitwie!")
                 return
