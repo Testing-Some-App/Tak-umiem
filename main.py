@@ -51,6 +51,9 @@ class DiceRollerApp:
         self.current_unit = None  # Obecnie wybrana jednostka
         self.current_unit_side = "własne"  # Strona obecnie wybranej jednostki
         
+        # Jednostki biorące udział w bitwie
+        self.participating_units = {"strona1": [], "strona2": []}  # Lista jednostek na każdej stronie
+        
         # Jednostki wybrane do bitwy
         self.selected_unit_side1 = None  # Nazwa wybranej jednostki dla strony 1
         self.selected_unit_side2 = None  # Nazwa wybranej jednostki dla strony 2
@@ -369,9 +372,13 @@ class DiceRollerApp:
         )
         self.dice1_label.grid(row=2, column=0, padx=20, pady=10)
         
+        # Ikon dla jednostek strony 1
+        self.side1_units_label = ttk.Label(dice_frame, text="", font=("Arial", 10))
+        self.side1_units_label.grid(row=3, column=0, padx=20)
+        
         # Wynik liczby ludzi i ikona doświadczenia strona 1
         result1_frame = ttk.Frame(dice_frame)
-        result1_frame.grid(row=3, column=0, padx=20)
+        result1_frame.grid(row=4, column=0, padx=20)
         self.dice1_people_result_label = ttk.Label(
             result1_frame, 
             text="", 
@@ -405,9 +412,13 @@ class DiceRollerApp:
         )
         self.dice2_label.grid(row=2, column=2, padx=20, pady=10)
         
+        # Ikon dla jednostek strony 2
+        self.side2_units_label = ttk.Label(dice_frame, text="", font=("Arial", 10))
+        self.side2_units_label.grid(row=3, column=2, padx=20)
+        
         # Wynik liczby ludzi i ikona doświadczenia strona 2
         result2_frame = ttk.Frame(dice_frame)
-        result2_frame.grid(row=3, column=2, padx=20)
+        result2_frame.grid(row=4, column=2, padx=20)
         self.dice2_people_result_label = ttk.Label(
             result2_frame, 
             text="", 
@@ -437,6 +448,13 @@ class DiceRollerApp:
         )
         self.tactical_result_label.grid(row=4, column=0, columnspan=3, pady=(10, 5))
         
+        # Przyciski "Dodaj więcej" i "Reset"
+        buttons_frame = ttk.Frame(self.game_frame)
+        buttons_frame.grid(row=5, column=0, columnspan=3, pady=(5, 5))
+        
+        ttk.Button(buttons_frame, text="Dodaj więcej", command=self.add_more_units).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(buttons_frame, text="Reset", command=self.reset_participating_units).pack(side=tk.LEFT, padx=(5, 0))
+        
         # Przycisk do generowania wyniku
         self.roll_button = ttk.Button(
             self.game_frame,
@@ -444,7 +462,7 @@ class DiceRollerApp:
             command=self.roll_dice,
             style="Roll.TButton"
         )
-        self.roll_button.grid(row=5, column=0, columnspan=3, pady=(5, 20))
+        self.roll_button.grid(row=6, column=0, columnspan=3, pady=(5, 20))
         
         # Stylizacja przycisków
         style = ttk.Style()
@@ -1789,6 +1807,95 @@ class DiceRollerApp:
         
         # Aktualizacja comboboxów wyboru jednostek do bitwy
         self.update_battle_units_combos()
+    
+    def add_more_units(self):
+        """Dodaje jednostki do udziału w bitwie"""
+        # Sprawdź czy są wybrane jednostki
+        unit1_selected = self.unit_side1_type != "brak" and hasattr(self, 'selected_unit_side1') and self.selected_unit_side1
+        unit2_selected = self.unit_side2_type != "brak" and hasattr(self, 'selected_unit_side2') and self.selected_unit_side2
+        
+        if not unit1_selected and not unit2_selected:
+            messagebox.showwarning("Błąd", "Wybierz przynajmniej jedną jednostkę!")
+            return
+        
+        # Dodaj jednostki do listy uczestniczących
+        if unit1_selected:
+            unit_info = {
+                'name': self.selected_unit_side1,
+                'people': int(self.dice1_people_var.get() or "0")
+            }
+            # Sprawdź czy jednostka już nie uczestniczy
+            existing = [u for u in self.participating_units["strona1"] if u['name'] == unit_info['name']]
+            if not existing:
+                self.participating_units["strona1"].append(unit_info)
+        
+        if unit2_selected:
+            unit_info = {
+                'name': self.selected_unit_side2,
+                'people': int(self.dice2_people_var.get() or "0")
+            }
+            # Sprawdź czy jednostka już nie uczestniczy
+            existing = [u for u in self.participating_units["strona2"] if u['name'] == unit_info['name']]
+            if not existing:
+                self.participating_units["strona2"].append(unit_info)
+        
+        # Reset modyfikatorów (oprócz liczby ludzi)
+        self.dice1_exp_var.set(0)
+        self.dice2_exp_var.set(0)
+        
+        # Wyczyść wybory jednostek
+        self.unit_side1_var.set("")
+        self.unit_side2_var.set("")
+        self.selected_unit_side1 = None
+        self.selected_unit_side2 = None
+        
+        # Aktualizuj wyświetlanie
+        self.update_units_display()
+        self.update_exp_bonuses_display()
+        
+        messagebox.showinfo("Sukces", "Jednostki dodane do bitwy!")
+    
+    def reset_participating_units(self):
+        """Resetuje jednostki biorące udział w bitwie"""
+        self.participating_units = {"strona1": [], "strona2": []}
+        
+        # Reset wszystkich pól
+        self.dice1_exp_var.set(0)
+        self.dice2_exp_var.set(0)
+        self.dice1_people_var.set("0")
+        self.dice2_people_var.set("0")
+        
+        # Wyczyść wybory jednostek
+        self.unit_side1_var.set("")
+        self.unit_side2_var.set("")
+        self.selected_unit_side1 = None
+        self.selected_unit_side2 = None
+        
+        # Aktualizuj wyświetlanie
+        self.update_units_display()
+        self.update_exp_bonuses_display()
+        
+        messagebox.showinfo("Sukces", "Jednostki uczestniczące zostały zresetowane!")
+    
+    def update_units_display(self):
+        """Aktualizuje wyświetlanie ikon jednostek"""
+        # Ikon dla strony 1
+        if hasattr(self, 'side1_units_label'):
+            if self.participating_units["strona1"]:
+                icons = "🪖" * len(self.participating_units["strona1"])
+                total_people = sum(u['people'] for u in self.participating_units["strona1"])
+                self.side1_units_label.config(text=f"{icons} ({total_people} ludzi)")
+            else:
+                self.side1_units_label.config(text="")
+        
+        # Ikon dla strony 2
+        if hasattr(self, 'side2_units_label'):
+            if self.participating_units["strona2"]:
+                icons = "🪖" * len(self.participating_units["strona2"])
+                total_people = sum(u['people'] for u in self.participating_units["strona2"])
+                self.side2_units_label.config(text=f"{icons} ({total_people} ludzi)")
+            else:
+                self.side2_units_label.config(text="")
 
 
 def main():
