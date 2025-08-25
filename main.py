@@ -1592,9 +1592,7 @@ class DiceRollerApp:
             messagebox.showwarning("Błąd", "Nie można usunąć jednostki która uczestniczy w bitwie!\nPierw zresetuj jednostki biorące udział w bitwie.")
             return
         
-        # Archiwizuj historię przed usunięciem
-        if 'history' in unit_data and unit_data['history']:
-            self.archive_unit_history(unit_name, unit_data)
+        # Historia jednostki zostanie usunięta wraz z jednostką
         
         # Usuń jednostkę
         del self.units[unit_side][unit_name]
@@ -1975,10 +1973,15 @@ class DiceRollerApp:
             # Dodaj jednostkę
             self.participating_units["strona1"].append(unit_info)
             
-            # Zwiększ liczbę ludzi w polu o liczbę ludzi z jednostki
-            current_people = int(self.dice1_people_var.get() or "0")
-            new_total = current_people + unit_people
-            self.dice1_people_var.set(str(new_total))
+            # Zwiększ liczbę ludzi tylko jeśli to nie pierwsza jednostka
+            # (pierwsza jednostka już ma swoją liczbę ludzi w polu)
+            if len(self.participating_units["strona1"]) > 1:
+                current_people = int(self.dice1_people_var.get() or "0")
+                new_total = current_people + unit_people
+                self.dice1_people_var.set(str(new_total))
+            else:
+                # Dla pierwszej jednostki zostaw obecną wartość
+                new_total = int(self.dice1_people_var.get() or "0")
             
             # Zablokuj automatyczne uzupełnianie dla strony 1
             self.side1_locked = True
@@ -2019,10 +2022,15 @@ class DiceRollerApp:
             # Dodaj jednostkę
             self.participating_units["strona2"].append(unit_info)
             
-            # Zwiększ liczbę ludzi w polu o liczbę ludzi z jednostki
-            current_people = int(self.dice2_people_var.get() or "0")
-            new_total = current_people + unit_people
-            self.dice2_people_var.set(str(new_total))
+            # Zwiększ liczbę ludzi tylko jeśli to nie pierwsza jednostka
+            # (pierwsza jednostka już ma swoją liczbę ludzi w polu)
+            if len(self.participating_units["strona2"]) > 1:
+                current_people = int(self.dice2_people_var.get() or "0")
+                new_total = current_people + unit_people
+                self.dice2_people_var.set(str(new_total))
+            else:
+                # Dla pierwszej jednostki zostaw obecną wartość
+                new_total = int(self.dice2_people_var.get() or "0")
             
             # Zablokuj automatyczne uzupełnianie dla strony 2
             self.side2_locked = True
