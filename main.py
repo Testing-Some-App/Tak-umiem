@@ -216,9 +216,7 @@ class DiceRollerApp:
                         "liczba_zwycięstw": unit_data.get("liczba_zwycięstw", 0),
                         "liczba_uzupełnień": unit_data.get("liczba_uzupełnień", 0),
                         "strona": side,
-                        "historia_bitew": unit_data.get("historia_bitew", []),
-                        # Zachowaj starą nazwę jako backup
-                        "_legacy_name": unit_key
+                        "historia_bitew": unit_data.get("historia_bitew", [])
                     }
                     
                     units_to_migrate[side].append((unit_key, new_unit_id, new_unit_data))
@@ -2231,7 +2229,7 @@ class DiceRollerApp:
             else:
                 # Pobierz wszystkie jednostki z sformatowanymi nazwami i ukryj te, które już uczestniczą
                 all_unit_ids = list(self.units[self.unit_side1_type].keys())
-                participating_ids = [u.get('id', u.get('name', '')) for u in self.participating_units["strona1"]]
+                participating_ids = [self.get_unit_id(u) for u in self.participating_units["strona1"]]
                 available_unit_ids = [unit_id for unit_id in all_unit_ids if unit_id not in participating_ids]
                 
                 # Stwórz listę sformatowanych nazw i mapę
@@ -2251,7 +2249,7 @@ class DiceRollerApp:
             else:
                 # Pobierz wszystkie jednostki z sformatowanymi nazwami i ukryj te, które już uczestniczą
                 all_unit_ids = list(self.units[self.unit_side2_type].keys())
-                participating_ids = [u.get('id', u.get('name', '')) for u in self.participating_units["strona2"]]
+                participating_ids = [self.get_unit_id(u) for u in self.participating_units["strona2"]]
                 available_unit_ids = [unit_id for unit_id in all_unit_ids if unit_id not in participating_ids]
                 
                 # Stwórz listę sformatowanych nazw i mapę
@@ -2309,162 +2307,115 @@ class DiceRollerApp:
             
             messagebox.showinfo("Sukces", f"Jednostka '{self.current_unit}' przeniesiona na stronę '{new_side}'")
     
+    def get_all_participating_units(self, side_number):
+        """Pomocnicza funkcja do zbierania wszystkich jednostek uczestniczących po stronie"""
+        if side_number == 1:
+            all_units = list(self.participating_units["strona1"])
+            if self.selected_unit_side1 and self.unit_side1_type != "brak":
+                if not any(self.get_unit_id(u) == self.selected_unit_side1 for u in all_units):
+                    unit_data = self.units[self.unit_side1_type][self.selected_unit_side1]
+                    all_units.append({
+                        'id': self.selected_unit_side1,
+                        'name': self.selected_unit_side1,
+                        'people': unit_data["liczba_ludzi"],
+                        'side': self.unit_side1_type
+                    })
+        else:
+            all_units = list(self.participating_units["strona2"])
+            if self.selected_unit_side2 and self.unit_side2_type != "brak":
+                if not any(self.get_unit_id(u) == self.selected_unit_side2 for u in all_units):
+                    unit_data = self.units[self.unit_side2_type][self.selected_unit_side2]
+                    all_units.append({
+                        'id': self.selected_unit_side2,
+                        'name': self.selected_unit_side2,
+                        'people': unit_data["liczba_ludzi"],
+                        'side': self.unit_side2_type
+                    })
+        return all_units
+    
+    def get_unit_id(self, unit):
+        """Pomocnicza funkcja do pobierania ID jednostki z obiektu"""
+        return unit.get('id', unit.get('name', ''))
+    
     def update_unit_stats_after_battle(self, dice1_final, dice2_final):
-        """Aktualizuje statystyki jednostek po bitwie"""
-        # Zbierz wszystkie jednostki strony 1
-        all_side1_units = list(self.participating_units["strona1"])
-        if self.selected_unit_side1 and self.unit_side1_type != "brak":
-            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side1 for u in all_side1_units):
-                all_side1_units.append({
-                    'id': self.selected_unit_side1,
-                    'name': self.selected_unit_side1,
-                    'people': self.dice1_people_original,
-                    'side': self.unit_side1_type
-                })
-        
-        # Aktualizacja jednostek strony 1
+        """Aktualizuje statystyki jednostek po bitwie (tylko zwycięstwa, straty obsługuje distribute_losses_among_units)"""
         side1_won = dice1_final > 1 and dice1_final > dice2_final
-        total_losses_1 = max(0, self.dice1_people_original - self.dice1_people_result)
-        
-        # Debug info - pokaż sformatowane nazwy
-        side1_display_names = []
-        for u in all_side1_units:
-            unit_id = u.get('id', u.get('name', ''))
-            side_name = u.get('side', '')
-            display_name = self.get_unit_display_name(unit_id, side_name) if unit_id and side_name else u.get('name', unit_id)
-            side1_display_names.append(display_name)
-        print(f"DEBUG: Strona 1 - jednostki: {side1_display_names}, wygrała: {side1_won}")
-        
-        for unit in all_side1_units:
-            unit_id = unit.get('id', unit.get('name', ''))
-            for side_name in ['własne', 'wroga']:
-                if unit_id in self.units[side_name]:
-                    unit_data = self.units[side_name][unit_id]
-                    
-                    # Aktualizacja zwycięstw (liczby ludzi już zaktualizowała distribute_losses_among_units)
-                    if side1_won:
-                        unit_data["liczba_zwycięstw"] += 1
-                    break
-        
-        # Zbierz wszystkie jednostki strony 2
-        all_side2_units = list(self.participating_units["strona2"])
-        if self.selected_unit_side2 and self.unit_side2_type != "brak":
-            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side2 for u in all_side2_units):
-                all_side2_units.append({
-                    'id': self.selected_unit_side2,
-                    'name': self.selected_unit_side2,
-                    'people': self.dice2_people_original,
-                    'side': self.unit_side2_type
-                })
-        
-        # Aktualizacja jednostek strony 2
         side2_won = dice2_final > 1 and dice2_final > dice1_final
-        total_losses_2 = max(0, self.dice2_people_original - self.dice2_people_result)
         
-        # Debug info - pokaż sformatowane nazwy
-        side2_display_names = []
-        for u in all_side2_units:
-            unit_id = u.get('id', u.get('name', ''))
-            side_name = u.get('side', '')
-            display_name = self.get_unit_display_name(unit_id, side_name) if unit_id and side_name else u.get('name', unit_id)
-            side2_display_names.append(display_name)
-        print(f"DEBUG: Strona 2 - jednostki: {side2_display_names}, wygrała: {side2_won}")
+        # Debug info z sformatowanymi nazwami
+        all_side1_units = self.get_all_participating_units(1)
+        all_side2_units = self.get_all_participating_units(2)
         
+        side1_names = [self.get_unit_display_name(self.get_unit_id(u), u.get('side', '')) for u in all_side1_units]
+        side2_names = [self.get_unit_display_name(self.get_unit_id(u), u.get('side', '')) for u in all_side2_units]
+        
+        
+        # Aktualizuj zwycięstwa dla strony 1
+        for unit in all_side1_units:
+            if side1_won:
+                self.update_unit_victories(self.get_unit_id(unit))
+        
+        # Aktualizuj zwycięstwa dla strony 2
         for unit in all_side2_units:
-            unit_id = unit.get('id', unit.get('name', ''))
-            for side_name in ['własne', 'wroga']:
-                if unit_id in self.units[side_name]:
-                    unit_data = self.units[side_name][unit_id]
-                    
-                    # Aktualizacja zwycięstw (liczby ludzi już zaktualizowała distribute_losses_among_units)
-                    if side2_won:
-                        unit_data["liczba_zwycięstw"] += 1
-                    break
+            if side2_won:
+                self.update_unit_victories(self.get_unit_id(unit))
         
-        # Aktualizacja interfejsu jednostek jeśli jakaś jest aktualnie wyświetlana
+        # Aktualizacja interfejsu
         if self.current_unit:
             self.show_unit_details()
-        
-        # Aktualizacja comboboxów wyboru jednostek do bitwy
         self.update_battle_units_combos()
+    
+    def update_unit_victories(self, unit_id):
+        """Aktualizuje liczbę zwycięstw jednostki"""
+        for side_name in ['własne', 'wroga']:
+            if unit_id in self.units[side_name]:
+                self.units[side_name][unit_id]["liczba_zwycięstw"] += 1
+                break
     
     def distribute_losses_among_units(self):
         """Rozdziela straty między jednostkami uczestniczącymi w bitwie"""
-        # Zbierz wszystkie jednostki strony 1 (participating + wybrane normalnie)
-        all_side1_units = list(self.participating_units["strona1"])
-        if self.selected_unit_side1 and self.unit_side1_type != "brak":
-            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side1 for u in all_side1_units):
-                # Pobierz rzeczywistą liczbę ludzi z jednostki
-                unit_data = self.units[self.unit_side1_type][self.selected_unit_side1]
-                all_side1_units.append({
-                    'id': self.selected_unit_side1,
-                    'name': self.selected_unit_side1,
-                    'people': unit_data["liczba_ludzi"],
-                    'side': self.unit_side1_type
-                })
+        self.distribute_losses_for_side(1)
+        self.distribute_losses_for_side(2)
+    
+    def distribute_losses_for_side(self, side_number):
+        """Rozdziela straty dla określonej strony"""
+        all_units = self.get_all_participating_units(side_number)
         
-        # Straty strony 1
-        if all_side1_units:
-            total_losses_side1 = self.dice1_people_original - self.dice1_people_result
-            if total_losses_side1 > 0:
-                losses_per_unit = total_losses_side1 // len(all_side1_units)
-                remainder = total_losses_side1 % len(all_side1_units)
-                
-                for i, unit in enumerate(all_side1_units):
-                    losses = losses_per_unit
-                    if i < remainder:  # Rozdziel resztę między pierwsze jednostki
-                        losses += 1
+        if not all_units:
+            return
+            
+        if side_number == 1:
+            total_losses = self.dice1_people_original - self.dice1_people_result
+            participating_key = "strona1"
+        else:
+            total_losses = self.dice2_people_original - self.dice2_people_result
+            participating_key = "strona2"
+            
+        if total_losses <= 0:
+            return
+            
+        losses_per_unit = total_losses // len(all_units)
+        remainder = total_losses % len(all_units)
+        
+        for i, unit in enumerate(all_units):
+            losses = losses_per_unit
+            if i < remainder:
+                losses += 1
+            
+            unit_id = self.get_unit_id(unit)
+            
+            # Aktualizuj w głównym słowniku jednostek
+            for side_name in ['własne', 'wroga']:
+                if unit_id in self.units[side_name]:
+                    new_people = max(0, self.units[side_name][unit_id]['liczba_ludzi'] - losses)
+                    self.units[side_name][unit_id]['liczba_ludzi'] = new_people
                     
-                    # Zaktualizuj jednostkę w głównym słowniku
-                    unit_id = unit.get('id', unit.get('name', ''))
-                    for side_name in ['własne', 'wroga']:
-                        if unit_id in self.units[side_name]:
-                            new_people = max(0, self.units[side_name][unit_id]['liczba_ludzi'] - losses)
-                            self.units[side_name][unit_id]['liczba_ludzi'] = new_people
-                            # Aktualizuj także w participating_units jeśli tam jest
-                            for pu in self.participating_units["strona1"]:
-                                if pu.get('id', pu.get('name', '')) == unit_id:
-                                    pu['people'] = new_people
-                                    break
+                    # Aktualizuj także w participating_units jeśli tam jest
+                    for pu in self.participating_units[participating_key]:
+                        if self.get_unit_id(pu) == unit_id:
+                            pu['people'] = new_people
                             break
-        
-        # Zbierz wszystkie jednostki strony 2 (participating + wybrane normalnie)
-        all_side2_units = list(self.participating_units["strona2"])
-        if self.selected_unit_side2 and self.unit_side2_type != "brak":
-            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side2 for u in all_side2_units):
-                # Pobierz rzeczywistą liczbę ludzi z jednostki
-                unit_data = self.units[self.unit_side2_type][self.selected_unit_side2]
-                all_side2_units.append({
-                    'id': self.selected_unit_side2,
-                    'name': self.selected_unit_side2,
-                    'people': unit_data["liczba_ludzi"],
-                    'side': self.unit_side2_type
-                })
-        
-        # Straty strony 2
-        if all_side2_units:
-            total_losses_side2 = self.dice2_people_original - self.dice2_people_result
-            if total_losses_side2 > 0:
-                losses_per_unit = total_losses_side2 // len(all_side2_units)
-                remainder = total_losses_side2 % len(all_side2_units)
-                
-                for i, unit in enumerate(all_side2_units):
-                    losses = losses_per_unit
-                    if i < remainder:  # Rozdziel resztę między pierwsze jednostki
-                        losses += 1
-                    
-                    # Zaktualizuj jednostkę w głównym słowniku
-                    unit_id = unit.get('id', unit.get('name', ''))
-                    for side_name in ['własne', 'wroga']:
-                        if unit_id in self.units[side_name]:
-                            new_people = max(0, self.units[side_name][unit_id]['liczba_ludzi'] - losses)
-                            self.units[side_name][unit_id]['liczba_ludzi'] = new_people
-                            # Aktualizuj także w participating_units jeśli tam jest
-                            for pu in self.participating_units["strona2"]:
-                                if pu.get('id', pu.get('name', '')) == unit_id:
-                                    pu['people'] = new_people
-                                    break
-                            break
+                    break
     
     def add_more_units_side(self, side_number):
         """Dodaje jednostkę do udziału w bitwie dla określonej strony"""
@@ -2486,7 +2437,7 @@ class DiceRollerApp:
             }
             
             # Sprawdź czy jednostka już nie uczestniczy
-            existing = [u for u in self.participating_units["strona1"] if u.get('id', u.get('name', '')) == unit_info['id']]
+            existing = [u for u in self.participating_units["strona1"] if self.get_unit_id(u) == unit_info['id']]
             if existing:
                 messagebox.showwarning("Błąd", "Ta jednostka już uczestniczy w bitwie!")
                 return
@@ -2537,7 +2488,7 @@ class DiceRollerApp:
             }
             
             # Sprawdź czy jednostka już nie uczestniczy
-            existing = [u for u in self.participating_units["strona2"] if u.get('id', u.get('name', '')) == unit_info['id']]
+            existing = [u for u in self.participating_units["strona2"] if self.get_unit_id(u) == unit_info['id']]
             if existing:
                 messagebox.showwarning("Błąd", "Ta jednostka już uczestniczy w bitwie!")
                 return
@@ -2674,17 +2625,8 @@ class DiceRollerApp:
             'side2_in_motion': side2_in_motion
         }
         
-        # Zbierz wszystkie jednostki strony 1 (participating + wybrane normalnie)
-        all_side1_units = list(self.participating_units["strona1"])
-        if self.selected_unit_side1 and self.unit_side1_type != "brak":
-            # Dodaj jednostkę wybraną normalnie, jeśli nie jest już w participating
-            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side1 for u in all_side1_units):
-                all_side1_units.append({
-                    'id': self.selected_unit_side1,
-                    'name': self.selected_unit_side1,  # dla kompatybilności
-                    'people': self.dice1_people_original,
-                    'side': self.unit_side1_type
-                })
+        # Pobierz wszystkie jednostki strony 1
+        all_side1_units = self.get_all_participating_units(1)
         
         # Historia dla jednostek strony 1
         if all_side1_units:
@@ -2712,7 +2654,7 @@ class DiceRollerApp:
                     unit_battle_info['enemy_units'] = side2_display_names
                     
                     # Dodaj do historii jednostki
-                    unit_id = unit.get('id', unit.get('name', ''))
+                    unit_id = self.get_unit_id(unit)
                     for side_name in ['własne', 'wroga']:
                         if unit_id in self.units[side_name]:
                             if 'historia_bitew' not in self.units[side_name][unit_id]:
@@ -2720,17 +2662,8 @@ class DiceRollerApp:
                             self.units[side_name][unit_id]['historia_bitew'].append(unit_battle_info)
                             break
         
-        # Zbierz wszystkie jednostki strony 2 (participating + wybrane normalnie)
-        all_side2_units = list(self.participating_units["strona2"])
-        if self.selected_unit_side2 and self.unit_side2_type != "brak":
-            # Dodaj jednostkę wybraną normalnie, jeśli nie jest już w participating
-            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side2 for u in all_side2_units):
-                all_side2_units.append({
-                    'id': self.selected_unit_side2,
-                    'name': self.selected_unit_side2,  # dla kompatybilności
-                    'people': self.dice2_people_original,
-                    'side': self.unit_side2_type
-                })
+        # Pobierz wszystkie jednostki strony 2
+        all_side2_units = self.get_all_participating_units(2)
         
         # Historia dla jednostek strony 2
         if all_side2_units:
@@ -2758,7 +2691,7 @@ class DiceRollerApp:
                     unit_battle_info['enemy_units'] = side1_display_names
                     
                     # Dodaj do historii jednostki
-                    unit_id = unit.get('id', unit.get('name', ''))
+                    unit_id = self.get_unit_id(unit)
                     for side_name in ['własne', 'wroga']:
                         if unit_id in self.units[side_name]:
                             if 'historia_bitew' not in self.units[side_name][unit_id]:
