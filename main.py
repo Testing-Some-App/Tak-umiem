@@ -2341,16 +2341,7 @@ class DiceRollerApp:
                 if unit_id in self.units[side_name]:
                     unit_data = self.units[side_name][unit_id]
                     
-                    # Aktualizacja liczby ludzi (proporcjonalnie do strat)
-                    if len(all_side1_units) == 1:
-                        # Jedna jednostka - bezpośrednio
-                        unit_data["liczba_ludzi"] = self.dice1_people_result
-                    else:
-                        # Wiele jednostek - rozdziel straty proporcjonalnie
-                        unit_losses = total_losses_1 // len(all_side1_units)
-                        unit_data["liczba_ludzi"] = max(0, unit_data["liczba_ludzi"] - unit_losses)
-                    
-                    # Aktualizacja zwycięstw
+                    # Aktualizacja zwycięstw (liczby ludzi już zaktualizowała distribute_losses_among_units)
                     if side1_won:
                         unit_data["liczba_zwycięstw"] += 1
                     break
@@ -2385,16 +2376,7 @@ class DiceRollerApp:
                 if unit_id in self.units[side_name]:
                     unit_data = self.units[side_name][unit_id]
                     
-                    # Aktualizacja liczby ludzi (proporcjonalnie do strat)
-                    if len(all_side2_units) == 1:
-                        # Jedna jednostka - bezpośrednio
-                        unit_data["liczba_ludzi"] = self.dice2_people_result
-                    else:
-                        # Wiele jednostek - rozdziel straty proporcjonalnie
-                        unit_losses = total_losses_2 // len(all_side2_units)
-                        unit_data["liczba_ludzi"] = max(0, unit_data["liczba_ludzi"] - unit_losses)
-                    
-                    # Aktualizacja zwycięstw
+                    # Aktualizacja zwycięstw (liczby ludzi już zaktualizowała distribute_losses_among_units)
                     if side2_won:
                         unit_data["liczba_zwycięstw"] += 1
                     break
@@ -2408,48 +2390,80 @@ class DiceRollerApp:
     
     def distribute_losses_among_units(self):
         """Rozdziela straty między jednostkami uczestniczącymi w bitwie"""
+        # Zbierz wszystkie jednostki strony 1 (participating + wybrane normalnie)
+        all_side1_units = list(self.participating_units["strona1"])
+        if self.selected_unit_side1 and self.unit_side1_type != "brak":
+            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side1 for u in all_side1_units):
+                # Pobierz rzeczywistą liczbę ludzi z jednostki
+                unit_data = self.units[self.unit_side1_type][self.selected_unit_side1]
+                all_side1_units.append({
+                    'id': self.selected_unit_side1,
+                    'name': self.selected_unit_side1,
+                    'people': unit_data["liczba_ludzi"],
+                    'side': self.unit_side1_type
+                })
+        
         # Straty strony 1
-        if self.participating_units["strona1"]:
+        if all_side1_units:
             total_losses_side1 = self.dice1_people_original - self.dice1_people_result
             if total_losses_side1 > 0:
-                losses_per_unit = total_losses_side1 // len(self.participating_units["strona1"])
-                remainder = total_losses_side1 % len(self.participating_units["strona1"])
+                losses_per_unit = total_losses_side1 // len(all_side1_units)
+                remainder = total_losses_side1 % len(all_side1_units)
                 
-                for i, unit in enumerate(self.participating_units["strona1"]):
+                for i, unit in enumerate(all_side1_units):
                     losses = losses_per_unit
                     if i < remainder:  # Rozdziel resztę między pierwsze jednostki
                         losses += 1
-                    
-                    # Odejmij straty od jednostki
-                    unit['people'] = max(0, unit['people'] - losses)
                     
                     # Zaktualizuj jednostkę w głównym słowniku
                     unit_id = unit.get('id', unit.get('name', ''))
                     for side_name in ['własne', 'wroga']:
                         if unit_id in self.units[side_name]:
-                            self.units[side_name][unit_id]['liczba_ludzi'] = unit['people']
+                            new_people = max(0, self.units[side_name][unit_id]['liczba_ludzi'] - losses)
+                            self.units[side_name][unit_id]['liczba_ludzi'] = new_people
+                            # Aktualizuj także w participating_units jeśli tam jest
+                            for pu in self.participating_units["strona1"]:
+                                if pu.get('id', pu.get('name', '')) == unit_id:
+                                    pu['people'] = new_people
+                                    break
                             break
         
+        # Zbierz wszystkie jednostki strony 2 (participating + wybrane normalnie)
+        all_side2_units = list(self.participating_units["strona2"])
+        if self.selected_unit_side2 and self.unit_side2_type != "brak":
+            if not any(u.get('id', u.get('name', '')) == self.selected_unit_side2 for u in all_side2_units):
+                # Pobierz rzeczywistą liczbę ludzi z jednostki
+                unit_data = self.units[self.unit_side2_type][self.selected_unit_side2]
+                all_side2_units.append({
+                    'id': self.selected_unit_side2,
+                    'name': self.selected_unit_side2,
+                    'people': unit_data["liczba_ludzi"],
+                    'side': self.unit_side2_type
+                })
+        
         # Straty strony 2
-        if self.participating_units["strona2"]:
+        if all_side2_units:
             total_losses_side2 = self.dice2_people_original - self.dice2_people_result
             if total_losses_side2 > 0:
-                losses_per_unit = total_losses_side2 // len(self.participating_units["strona2"])
-                remainder = total_losses_side2 % len(self.participating_units["strona2"])
+                losses_per_unit = total_losses_side2 // len(all_side2_units)
+                remainder = total_losses_side2 % len(all_side2_units)
                 
-                for i, unit in enumerate(self.participating_units["strona2"]):
+                for i, unit in enumerate(all_side2_units):
                     losses = losses_per_unit
                     if i < remainder:  # Rozdziel resztę między pierwsze jednostki
                         losses += 1
-                    
-                    # Odejmij straty od jednostki
-                    unit['people'] = max(0, unit['people'] - losses)
                     
                     # Zaktualizuj jednostkę w głównym słowniku
                     unit_id = unit.get('id', unit.get('name', ''))
                     for side_name in ['własne', 'wroga']:
                         if unit_id in self.units[side_name]:
-                            self.units[side_name][unit_id]['liczba_ludzi'] = unit['people']
+                            new_people = max(0, self.units[side_name][unit_id]['liczba_ludzi'] - losses)
+                            self.units[side_name][unit_id]['liczba_ludzi'] = new_people
+                            # Aktualizuj także w participating_units jeśli tam jest
+                            for pu in self.participating_units["strona2"]:
+                                if pu.get('id', pu.get('name', '')) == unit_id:
+                                    pu['people'] = new_people
+                                    break
                             break
     
     def add_more_units_side(self, side_number):
