@@ -363,17 +363,17 @@ class DiceRollerApp:
         results_container = ttk.Frame(self.game_frame)
         results_container.grid(row=3, column=0, columnspan=3, sticky=tk.W+tk.E, pady=(0, 20))
         
-        # Mały przycisk reset po lewej stronie
-        reset_button = ttk.Button(results_container, text="R", command=self.reset_participating_units, width=2)
-        reset_button.grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
-        
         # Frame dla wyników kości (horizontal layout) - wycentrowany
         dice_frame = ttk.LabelFrame(results_container, text="Wyniki", padding="15")
-        dice_frame.grid(row=0, column=1, sticky=tk.W+tk.E, padx=(15, 0))
+        dice_frame.grid(row=0, column=0, sticky=tk.W+tk.E, padx=(50, 50))
+        
+        # Mały przycisk reset obok tabeli wyników
+        reset_button = ttk.Button(results_container, text="R", command=self.reset_participating_units, width=2)
+        reset_button.grid(row=0, column=1, sticky=tk.W, padx=(5, 0))
         
         # Konfiguracja kolumn
-        results_container.columnconfigure(0, weight=0)
-        results_container.columnconfigure(1, weight=1)
+        results_container.columnconfigure(0, weight=1)
+        results_container.columnconfigure(1, weight=0)
         
         # Pierwsza strona - liczba ludzi i nazwa
         people1_frame = ttk.Frame(dice_frame)
@@ -1103,6 +1103,15 @@ class DiceRollerApp:
         side1_units = [u['name'] for u in self.participating_units["strona1"]]
         side2_units = [u['name'] for u in self.participating_units["strona2"]]
         
+        # Dodaj jednostki wybrane normalnie (nie przez "Dodaj więcej")
+        if self.selected_unit_side1 and self.unit_side1_type != "brak":
+            if self.selected_unit_side1 not in side1_units:
+                side1_units.append(self.selected_unit_side1)
+        
+        if self.selected_unit_side2 and self.unit_side2_type != "brak":
+            if self.selected_unit_side2 not in side2_units:
+                side2_units.append(self.selected_unit_side2)
+        
         # Określ tryb walki
         side1_attacking = getattr(self, 'side1_attack_var', tk.BooleanVar()).get()
         side2_attacking = getattr(self, 'side2_attack_var', tk.BooleanVar()).get() 
@@ -1321,11 +1330,49 @@ class DiceRollerApp:
             exp1_icon = " ⭐" if entry['exp1'] else ""
             exp2_icon = " ⭐" if entry['exp2'] else ""
             
-            # Nazwy jednostek w historii bitwy (dla starszych zapisów może nie być)
-            unit1_info = f" ({entry.get('unit1_name', '')})" if entry.get('unit1_name') else ""
-            unit2_info = f" ({entry.get('unit2_name', '')})" if entry.get('unit2_name') else ""
+            # Nowy format nazw w zależności od trybu i jednostek
+            side1_units = entry.get('side1_units', [])
+            side2_units = entry.get('side2_units', [])
             
-            history_line = f"#{i}: Strona 1: {entry['dice1']}{exp1_icon}{unit1_info} | Strona 2: {entry['dice2']}{exp2_icon}{unit2_info}\n"
+            # Określ format na podstawie jednostek i trybu
+            if side1_units and side2_units:
+                # Mamy jednostki po obu stronach
+                side1_in_motion = entry.get('side1_in_motion', False)
+                side2_in_motion = entry.get('side2_in_motion', False)
+                side1_attacking = entry.get('side1_attacking', False)
+                side2_attacking = entry.get('side2_attacking', False)
+                
+                # Formatuj nazwę jednostek (główna + dodatkowe po przecinku)
+                side1_name = side1_units[0]
+                if len(side1_units) > 1:
+                    side1_name += ", " + ", ".join(side1_units[1:])
+                    
+                side2_name = side2_units[0]
+                if len(side2_units) > 1:
+                    side2_name += ", " + ", ".join(side2_units[1:])
+                
+                if side1_in_motion or side2_in_motion:
+                    # W ruchu
+                    battle_desc = f"Bitwa \"{side1_name}\" z \"{side2_name}\""
+                elif side1_attacking:
+                    # Strona 1 atakuje
+                    battle_desc = f"Ofensywa \"{side1_name}\" na \"{side2_name}\""
+                elif side2_attacking:
+                    # Strona 2 atakuje
+                    battle_desc = f"Ofensywa \"{side2_name}\" na \"{side1_name}\""
+                else:
+                    # Domyślnie atak vs obrona
+                    battle_desc = f"Ofensywa \"{side1_name}\" na \"{side2_name}\""
+                
+                history_line = f"#{i}: {battle_desc}\n"
+                history_line += f"    Kostki: {entry['dice1']}{exp1_icon} vs {entry['dice2']}{exp2_icon}\n"
+            else:
+                # Stary format dla starych zapisów lub brak jednostek
+                unit1_info = f" ({entry.get('unit1_name', '')})" if entry.get('unit1_name') else ""
+                unit2_info = f" ({entry.get('unit2_name', '')})" if entry.get('unit2_name') else ""
+                
+                history_line = f"#{i}: Strona 1: {entry['dice1']}{exp1_icon}{unit1_info} | Strona 2: {entry['dice2']}{exp2_icon}{unit2_info}\n"
+                
             history_line += f"    Ludzie: {entry['people1_before']}→{entry['people1_after']} | {entry['people2_before']}→{entry['people2_after']}\n\n"
             
             self.battle_history_text.insert(tk.END, history_line)
@@ -2161,8 +2208,18 @@ class DiceRollerApp:
             'zwyciestwo': False
         }
         
+        # Zbierz wszystkie jednostki strony 1 (participating + wybrane normalnie)
+        all_side1_units = list(self.participating_units["strona1"])
+        if self.selected_unit_side1 and self.unit_side1_type != "brak":
+            # Dodaj jednostkę wybraną normalnie, jeśli nie jest już w participating
+            if not any(u['name'] == self.selected_unit_side1 for u in all_side1_units):
+                all_side1_units.append({
+                    'name': self.selected_unit_side1,
+                    'people': self.dice1_people_original
+                })
+        
         # Historia dla jednostek strony 1
-        if self.participating_units["strona1"]:
+        if all_side1_units:
             battle_info_side1 = battle_info.copy()
             battle_info_side1['wynik_kostki'] = dice1_final
             battle_info_side1['przeciwnik_kostka'] = dice2_final
@@ -2171,11 +2228,11 @@ class DiceRollerApp:
             
             # Rozdziel straty między jednostkami
             total_losses = battle_info_side1['straty']
-            if total_losses > 0 and len(self.participating_units["strona1"]) > 0:
-                losses_per_unit = total_losses // len(self.participating_units["strona1"])
-                remainder = total_losses % len(self.participating_units["strona1"])
+            if len(all_side1_units) > 0:
+                losses_per_unit = total_losses // len(all_side1_units) if total_losses > 0 else 0
+                remainder = total_losses % len(all_side1_units) if total_losses > 0 else 0
                 
-                for i, unit in enumerate(self.participating_units["strona1"]):
+                for i, unit in enumerate(all_side1_units):
                     unit_losses = losses_per_unit
                     if i < remainder:
                         unit_losses += 1
@@ -2192,8 +2249,18 @@ class DiceRollerApp:
                             self.units[side_name][unit_name]['historia_bitew'].append(unit_battle_info)
                             break
         
+        # Zbierz wszystkie jednostki strony 2 (participating + wybrane normalnie)
+        all_side2_units = list(self.participating_units["strona2"])
+        if self.selected_unit_side2 and self.unit_side2_type != "brak":
+            # Dodaj jednostkę wybraną normalnie, jeśli nie jest już w participating
+            if not any(u['name'] == self.selected_unit_side2 for u in all_side2_units):
+                all_side2_units.append({
+                    'name': self.selected_unit_side2,
+                    'people': self.dice2_people_original
+                })
+        
         # Historia dla jednostek strony 2
-        if self.participating_units["strona2"]:
+        if all_side2_units:
             battle_info_side2 = battle_info.copy()
             battle_info_side2['wynik_kostki'] = dice2_final
             battle_info_side2['przeciwnik_kostka'] = dice1_final
@@ -2202,11 +2269,11 @@ class DiceRollerApp:
             
             # Rozdziel straty między jednostkami
             total_losses = battle_info_side2['straty']
-            if total_losses > 0 and len(self.participating_units["strona2"]) > 0:
-                losses_per_unit = total_losses // len(self.participating_units["strona2"])
-                remainder = total_losses % len(self.participating_units["strona2"])
+            if len(all_side2_units) > 0:
+                losses_per_unit = total_losses // len(all_side2_units) if total_losses > 0 else 0
+                remainder = total_losses % len(all_side2_units) if total_losses > 0 else 0
                 
-                for i, unit in enumerate(self.participating_units["strona2"]):
+                for i, unit in enumerate(all_side2_units):
                     unit_losses = losses_per_unit
                     if i < remainder:
                         unit_losses += 1
